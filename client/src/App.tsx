@@ -36,8 +36,27 @@ function App() {
     });
 
     socket.on('stateUpdate', (newState: GameState) => {
-      // console.log('State received', newState.strokes?.length);
-      setGameState(newState);
+      setGameState(prevState => {
+        const myId = socketRef.current?.id;
+        // If we have a local position for ourselves, keep it (Client Prediction)
+        // Otherwise, accept server state
+        if (myId && prevState.players[myId] && newState.players[myId]) {
+          // Create a merged state where WE stay where we are locally
+          // This prevents rubber-banding when the server echoes back our old position
+          return {
+            ...newState,
+            players: {
+              ...newState.players,
+              [myId]: {
+                ...newState.players[myId], // Keep server props like color/role
+                x: prevState.players[myId].x, // Keep local X
+                y: prevState.players[myId].y  // Keep local Y
+              }
+            }
+          };
+        }
+        return newState;
+      });
     });
 
     return () => {
@@ -79,6 +98,7 @@ function App() {
 
       if (!myId) return;
 
+      // We need to read the VERY LATEST state from the ref to avoid stale closures
       const currentState = gameStateRef.current;
       const me = currentState.players[myId];
 
@@ -96,9 +116,21 @@ function App() {
       if (dx !== 0 || dy !== 0) {
         const newX = me.x + dx;
         const newY = me.y + dy;
+
+        // 1. Optimistic Local Update (Client Prediction)
+        // We update our own state IMMEDIATELY so it feels responsive
+        setGameState(prev => ({
+          ...prev,
+          players: {
+            ...prev.players,
+            [myId]: { ...prev.players[myId], x: newX, y: newY }
+          }
+        }));
+
+        // 2. Send to Server
         socket.emit('move', { x: newX, y: newY });
       }
-    }, 30); // ~30fps update to server
+    }, 20); // Increased tick rate slightly for smoother local feel (50fps)
 
     return () => clearInterval(loop);
   }, []);
