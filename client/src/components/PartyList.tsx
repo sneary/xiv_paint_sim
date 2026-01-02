@@ -113,7 +113,7 @@ const PartyList: React.FC<PartyListProps> = ({ players, myId }) => {
                             marginLeft: '8px',
                             textTransform: 'uppercase'
                         }}>
-                            {player.role.substring(0, 3)}
+                            {player.role}
                         </span>
 
                         {/* Debuffs */}
