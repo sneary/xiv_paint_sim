@@ -1,0 +1,7 @@
+/* App specific styles can go here, but clearing default #root limits */
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
