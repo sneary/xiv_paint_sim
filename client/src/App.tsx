@@ -91,17 +91,17 @@ function App() {
     const gain = ctx.createGain();
 
     osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(150, ctx.currentTime); // Low pitch
-    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.1);
+    osc.frequency.setValueAtTime(250, ctx.currentTime); // Higher start pitch for audibility
+    osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.2);
 
-    gain.gain.setValueAtTime(0.5, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    gain.gain.setValueAtTime(0.8, ctx.currentTime); // Louder (was 0.5)
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2); // Slower fade
 
     osc.connect(gain);
     gain.connect(ctx.destination);
 
     osc.start();
-    osc.stop(ctx.currentTime + 0.2);
+    osc.stop(ctx.currentTime + 0.25);
   };
 
   // Socket Events
