@@ -126,12 +126,12 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                                     text={player.name}
                                     anchor={0.5}
                                     y={isSpectator ? 0 : -25} // Center name if spectator, otherwise above sprite
+                                    alpha={isSpectator ? 0.6 : 1}
                                     style={new PIXI.TextStyle({
                                         fill: '#ffffff',
                                         fontSize: 14,
                                         stroke: '#000000',
                                         strokeThickness: 4,
-                                        alpha: isSpectator ? 0.6 : 1 // Slightly transparent for spectators maybe? Or user said "white". Let's keep 1.
                                     })}
                                 />
                             )}

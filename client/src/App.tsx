@@ -178,8 +178,20 @@ function App() {
       }
 
       if (dx !== 0 || dy !== 0) {
-        const newX = me.x + dx;
-        const newY = me.y + dy;
+        let newX = me.x + dx;
+        let newY = me.y + dy;
+
+        // Boundary Checks - Keep within Drawable Area (Canvas 800x600)
+        // We ignore the arena shape (Circle/Square) effectively allowing players to run "out of bounds" mechanic-wise,
+        // but keeping them on screen.
+        const playerRadius = 15; // 10 radius + 5 stroke/buffer
+        // Wait, logic in this file seems to treat 800x600 as base. 
+        // The previous logic used hardcoded centerX=400.
+        // Let's stick to 800x600 base coord system which matches server state.
+
+        // Clamp to 800x600
+        newX = Math.max(playerRadius, Math.min(newX, 800 - playerRadius));
+        newY = Math.max(playerRadius, Math.min(newY, 600 - playerRadius));
 
         // 1. Optimistic Local Update (Client Prediction)
         // We update our own state IMMEDIATELY so it feels responsive
@@ -237,7 +249,7 @@ function App() {
     socketRef.current?.emit('endStroke');
   };
 
-  const handleJoin = (name: string, color: number, role: 'tank' | 'healer' | 'dps') => {
+  const handleJoin = (name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator') => {
     if (socketRef.current) {
       socketRef.current.emit('joinGame', { name, color, role });
       setSelectedColor(color);
@@ -257,7 +269,13 @@ function App() {
   };
 
   if (!hasJoined) {
-    return <LandingPage onJoin={handleJoin} />;
+    const playersList = Object.values(gameState.players);
+    const takenNames = playersList.map(p => p.name);
+    const takenColors = playersList
+      .filter(p => p.role !== 'spectator')
+      .map(p => p.color);
+
+    return <LandingPage onJoin={handleJoin} takenNames={takenNames} takenColors={takenColors} />;
   }
 
   return (
@@ -336,7 +354,7 @@ function App() {
           <div>
             <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Paint Color</h3>
             <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '150px' }}>
-              {[0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0x000000].map(color => (
+              {[0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0xCC5500].map(color => (
                 <div
                   key={color}
                   onClick={() => {

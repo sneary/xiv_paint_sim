@@ -9,7 +9,7 @@ interface LandingPageProps {
 
 const COLORS = [
     0xff0000, 0x00ff00, 0x0000ff, 0xffff00,
-    0xff00ff, 0x00ffff, 0xffffff, 0xffaa00
+    0xff00ff, 0x00ffff, 0xffffff, 0xCC5500
 ];
 
 const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {

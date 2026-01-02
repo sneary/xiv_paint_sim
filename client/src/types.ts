@@ -2,22 +2,9 @@ export interface Player {
     id: string;
     x: number;
     y: number;
-    role: 'tank' | 'healer' | 'dps';
-    name?: string;
-    color?: number;
-}
-
-export interface ArenaConfig {
-    shape: 'circle' | 'square';
-    width: number;
-    height: number;
-}
-
-export interface Player {
-    id: string;
-    x: number;
-    y: number;
     role: 'tank' | 'healer' | 'dps' | 'spectator';
+    name: string;
+    color: number;
 }
 
 export interface ArenaConfig {
