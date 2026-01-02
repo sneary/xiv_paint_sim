@@ -51,7 +51,9 @@ function App() {
       // We want some padding.
       const w = window.innerWidth;
       const h = window.innerHeight;
-      const s = Math.min(w / 800, (h - 50) / 600); // -50 for header
+      // Reduce buffer on mobile to maximize size
+      const hBuffer = mobile ? 20 : 50;
+      const s = Math.min(w / 800, (h - hBuffer) / 600);
       setScale(s < 1 ? s : 1);
     };
 
@@ -421,11 +423,10 @@ function App() {
         </div>
       )}
 
-      <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>
-      <div style={{ color: '#aaa', marginBottom: '1rem' }}>
+      {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>}
+      <div style={{ color: '#aaa', marginBottom: '1rem', fontSize: isMobile ? '0.8rem' : '1rem' }}>
         {myId ? `Connected as ${gameState.players[myId]?.name || myId}` : 'Connecting...'}
-        <br />
-        Use W/A/S/D to move. Click and drag in arena to paint.
+        {!isMobile && <><br />Use W/A/S/D to move. Click and drag in arena to paint.</>}
       </div>
       <Arena
         players={gameState.players}
