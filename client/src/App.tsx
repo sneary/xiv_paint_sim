@@ -7,7 +7,10 @@ import type { GameState, ArenaConfig } from './types';
 
 import LandingPage from './components/LandingPage';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+// In production (Single Service), we want to connect to the same origin (relative path)
+// If VITE_SOCKET_URL is set (e.g. for split hosting), use that.
+// If dev, default to localhost.
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? undefined : 'http://localhost:3001');
 
 function App() {
   const [gameState, setGameState] = useState<GameState>({
