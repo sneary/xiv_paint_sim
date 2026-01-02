@@ -41,20 +41,21 @@ function App() {
   const handleJoystickMove = (event: any) => {
     // console.log('Joystick move:', event);
     if (event) {
-      // Values seem to be null when stopped?
-      // react-joystick-component usually returns x/y/direction/distance
-      // Let's log it to be sure what we get on mobile.
-      // console.log(event.x, event.y);
+      setDebugInfo(`Event: x=${event.x?.toFixed(1)}, y=${event.y?.toFixed(1)}, type=${event.type}`);
+
       if (event.x !== null && event.y !== null && event.x !== undefined && event.y !== undefined) {
         joystickRef.current = { x: event.x, y: event.y };
       } else {
         joystickRef.current = null;
       }
+    } else {
+      setDebugInfo("Event is null");
     }
   };
 
   const handleJoystickStop = () => {
     joystickRef.current = null;
+    setDebugInfo("Stopped");
   };
 
   useEffect(() => {
