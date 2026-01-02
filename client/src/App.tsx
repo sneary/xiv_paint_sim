@@ -30,6 +30,7 @@ function App() {
   // Joystick state
   const joystickRef = useRef<{ x: number, y: number } | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [debugInfo, setDebugInfo] = useState<string>("No Input");
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -38,10 +39,17 @@ function App() {
   }, []);
 
   const handleJoystickMove = (event: any) => {
-    if (event.x !== undefined && event.y !== undefined) {
-      joystickRef.current = { x: event.x, y: event.y };
-    } else {
-      joystickRef.current = null;
+    // console.log('Joystick move:', event);
+    if (event) {
+      // Values seem to be null when stopped?
+      // react-joystick-component usually returns x/y/direction/distance
+      // Let's log it to be sure what we get on mobile.
+      // console.log(event.x, event.y);
+      if (event.x !== null && event.y !== null && event.x !== undefined && event.y !== undefined) {
+        joystickRef.current = { x: event.x, y: event.y };
+      } else {
+        joystickRef.current = null;
+      }
     }
   };
 
@@ -350,6 +358,8 @@ function App() {
         {myId ? `Connected as ${gameState.players[myId]?.name || myId}` : 'Connecting...'}
         <br />
         Use W/A/S/D to move. Click and drag in arena to paint.
+        <br />
+        Debug: {debugInfo}
       </div>
       <Arena
         players={gameState.players}
