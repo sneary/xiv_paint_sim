@@ -3,7 +3,7 @@ import type { Player } from '../types';
 
 interface PartyListProps {
     players: Record<string, Player>;
-    myId: string | null;
+    myId?: string | null;
 }
 
 const ROLE_PRIORITY: Record<string, number> = {
