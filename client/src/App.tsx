@@ -30,7 +30,6 @@ function App() {
   // Joystick state
   const joystickRef = useRef<{ x: number, y: number } | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-  const [debugInfo, setDebugInfo] = useState<string>("No Input");
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -39,23 +38,17 @@ function App() {
   }, []);
 
   const handleJoystickMove = (event: any) => {
-    // console.log('Joystick move:', event);
     if (event) {
-      setDebugInfo(`Event: x=${event.x?.toFixed(1)}, y=${event.y?.toFixed(1)}, type=${event.type}`);
-
       if (event.x !== null && event.y !== null && event.x !== undefined && event.y !== undefined) {
         joystickRef.current = { x: event.x, y: event.y };
       } else {
         joystickRef.current = null;
       }
-    } else {
-      setDebugInfo("Event is null");
     }
   };
 
   const handleJoystickStop = () => {
     joystickRef.current = null;
-    setDebugInfo("Stopped");
   };
 
   useEffect(() => {
@@ -147,12 +140,11 @@ function App() {
 
       // Joystick override
       if (joystickRef.current) {
-        // Joystick x/y are roughly -50 to 50 based on size 100
         const jx = joystickRef.current.x;
         const jy = joystickRef.current.y;
-        // Normalize to speed (max throw is roughly 50)
-        dx += (jx / 50) * speed;
-        dy -= (jy / 50) * speed; // Joystick Y is inverted relative to screen coords
+        // User confirmed values are -1 to 1.
+        dx += jx * speed;
+        dy -= jy * speed; // Joystick Y is inverted relative to screen coords
       }
 
       if (dx !== 0 || dy !== 0) {
@@ -359,8 +351,6 @@ function App() {
         {myId ? `Connected as ${gameState.players[myId]?.name || myId}` : 'Connecting...'}
         <br />
         Use W/A/S/D to move. Click and drag in arena to paint.
-        <br />
-        Debug: {debugInfo}
       </div>
       <Arena
         players={gameState.players}
