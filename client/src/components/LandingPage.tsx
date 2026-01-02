@@ -2,7 +2,9 @@ import { useState } from 'react';
 import './LandingPage.css';
 
 interface LandingPageProps {
-    onJoin: (name: string, color: number, role: 'tank' | 'healer' | 'dps') => void;
+    onJoin: (name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator') => void;
+    takenNames: string[];
+    takenColors: number[];
 }
 
 const COLORS = [
@@ -10,16 +12,31 @@ const COLORS = [
     0xff00ff, 0x00ffff, 0xffffff, 0xffaa00
 ];
 
-const LandingPage = ({ onJoin }: LandingPageProps) => {
+const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
     const [name, setName] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLORS[0]);
-    const [selectedRole, setSelectedRole] = useState<'tank' | 'healer' | 'dps'>('dps');
+    const [selectedRole, setSelectedRole] = useState<'tank' | 'healer' | 'dps' | 'spectator'>('dps');
+    const [error, setError] = useState('');
+
+    const isNameTaken = (n: string) => takenNames.some(taken => taken.toLowerCase() === n.toLowerCase());
+    const isColorTaken = (c: number) => takenColors.includes(c);
+    const isSpectator = selectedRole === 'spectator';
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (name.trim()) {
-            onJoin(name, selectedColor, selectedRole);
+        setError('');
+
+        if (!name.trim()) return;
+        if (isNameTaken(name)) {
+            setError('Name is already taken.');
+            return;
         }
+        if (!isSpectator && isColorTaken(selectedColor)) {
+            setError('Color is already taken.');
+            return;
+        }
+
+        onJoin(name, selectedColor, selectedRole);
     };
 
     return (
@@ -38,60 +55,78 @@ const LandingPage = ({ onJoin }: LandingPageProps) => {
                                 className="input-field"
                                 type="text"
                                 value={name}
-                                onChange={(e) => setName(e.target.value)}
+                                onChange={(e) => {
+                                    setName(e.target.value);
+                                    setError('');
+                                }}
                                 placeholder="Enter Name"
                                 maxLength={12}
                                 autoFocus
+                                style={{ borderColor: isNameTaken(name) ? '#ff4444' : '' }}
                             />
+                            {isNameTaken(name) && <div style={{ color: '#ff4444', fontSize: '0.8rem', marginTop: '4px' }}>Name taken</div>}
                         </div>
 
                         <div className="form-group">
-                            <label className="form-label">Role (Main Color)</label>
-                            <div className="role-selector" style={{ display: 'flex', gap: '10px' }}>
+                            <label className="form-label">Role</label>
+                            <div className="role-selector" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
                                 <div
                                     className={`role-option tank ${selectedRole === 'tank' ? 'selected' : ''}`}
                                     onClick={() => setSelectedRole('tank')}
-                                >
-                                    Tank
-                                </div>
+                                >Tank</div>
                                 <div
                                     className={`role-option healer ${selectedRole === 'healer' ? 'selected' : ''}`}
                                     onClick={() => setSelectedRole('healer')}
-                                >
-                                    Healer
-                                </div>
+                                >Healer</div>
                                 <div
                                     className={`role-option dps ${selectedRole === 'dps' ? 'selected' : ''}`}
                                     onClick={() => setSelectedRole('dps')}
+                                >DPS</div>
+                            </div>
+                            {/* Spectator Button - Smaller/Separate */}
+                            <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                                <div
+                                    className={`role-option spectator ${selectedRole === 'spectator' ? 'selected' : ''}`}
+                                    onClick={() => setSelectedRole('spectator')}
+                                    style={{ flex: '0 0 auto', padding: '5px 15px', fontSize: '0.9rem', opacity: 0.8 }}
                                 >
-                                    DPS
+                                    👁 Spectator (No Slot)
                                 </div>
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Ring & Paint Color</label>
-                            <div className="color-grid">
-                                {COLORS.map(color => (
-                                    <div
-                                        key={color}
-                                        onClick={() => setSelectedColor(color)}
-                                        className={`color-option ${selectedColor === color ? 'selected' : ''}`}
-                                        style={{
-                                            backgroundColor: '#' + color.toString(16).padStart(6, '0'),
-                                            color: '#' + color.toString(16).padStart(6, '0') // Used for glow effect
-                                        }}
-                                    />
-                                ))}
+                        {!isSpectator && (
+                            <div className="form-group">
+                                <label className="form-label">Ring & Paint Color</label>
+                                <div className="color-grid">
+                                    {COLORS.map(color => {
+                                        const taken = isColorTaken(color);
+                                        return (
+                                            <div
+                                                key={color}
+                                                onClick={() => !taken && setSelectedColor(color)}
+                                                className={`color-option ${selectedColor === color ? 'selected' : ''} ${taken ? 'disabled' : ''}`}
+                                                style={{
+                                                    backgroundColor: '#' + color.toString(16).padStart(6, '0'),
+                                                    color: '#' + color.toString(16).padStart(6, '0'),
+                                                    opacity: taken ? 0.2 : 1,
+                                                    cursor: taken ? 'not-allowed' : 'pointer'
+                                                }}
+                                            />
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
+                        )}
+
+                        {error && <div style={{ color: '#ff4444', marginBottom: '10px', textAlign: 'center' }}>{error}</div>}
 
                         <button
                             className="join-button"
                             type="submit"
-                            disabled={!name.trim()}
+                            disabled={!name.trim() || isNameTaken(name) || (!isSpectator && isColorTaken(selectedColor))}
                         >
-                            Enter Duty
+                            {isSpectator ? 'Watch Game' : 'Enter Duty'}
                         </button>
                     </form>
                 </div>

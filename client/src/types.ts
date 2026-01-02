@@ -17,7 +17,7 @@ export interface Player {
     id: string;
     x: number;
     y: number;
-    role: 'tank' | 'healer' | 'dps';
+    role: 'tank' | 'healer' | 'dps' | 'spectator';
 }
 
 export interface ArenaConfig {

@@ -109,6 +109,11 @@ function App() {
       });
     });
 
+    socket.on('joinError', (msg: string) => {
+      alert(msg); // Simple alert for now, or pass check to LandingPage
+      setHasJoined(false);
+    });
+
     return () => {
       socket.disconnect();
     };

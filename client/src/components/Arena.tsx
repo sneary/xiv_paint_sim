@@ -92,45 +92,52 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                 />
 
                 {/* Players */}
-                {Object.values(players).map((player) => (
-                    <Container key={player.id} x={player.x} y={player.y}>
-                        <Graphics
-                            draw={(g: PIXI.Graphics) => {
-                                g.clear();
-                                const isMe = player.id === myId;
-                                // Role Colors
-                                const roleColors = {
-                                    tank: 0x4a90e2,
-                                    healer: 0x7ed321,
-                                    dps: 0xd0021b
-                                };
-                                const baseColor = roleColors[player.role] || 0xd0021b; // Default DPS red
+                {Object.values(players).map((player) => {
+                    const isSpectator = player.role === 'spectator';
+                    return (
+                        <Container key={player.id} x={player.x} y={player.y}>
+                            {!isSpectator && (
+                                <Graphics
+                                    draw={(g: PIXI.Graphics) => {
+                                        g.clear();
+                                        const isMe = player.id === myId;
+                                        // Role Colors
+                                        const roleColors = {
+                                            tank: 0x4a90e2,
+                                            healer: 0x7ed321,
+                                            dps: 0xd0021b
+                                            // spectator handled above
+                                        };
+                                        const baseColor = (roleColors as any)[player.role] || 0xd0021b;
 
-                                g.beginFill(baseColor);
-                                g.drawCircle(0, 0, 10); // Player hitbox
-                                g.endFill();
+                                        g.beginFill(baseColor);
+                                        g.drawCircle(0, 0, 10); // Player hitbox
+                                        g.endFill();
 
-                                // Ring uses the player's selected paint color
-                                // Highlight 'me' with thicker stroke
-                                g.lineStyle(isMe ? 3 : 2, player.color, 1);
-                                g.drawCircle(0, 0, 15);
-                            }}
-                        />
-                        {player.name && (
-                            <Text
-                                text={player.name}
-                                anchor={0.5}
-                                y={-25}
-                                style={new PIXI.TextStyle({
-                                    fill: '#ffffff',
-                                    fontSize: 14,
-                                    stroke: '#000000',
-                                    strokeThickness: 4,
-                                })}
-                            />
-                        )}
-                    </Container>
-                ))}
+                                        // Ring uses the player's selected paint color
+                                        // Highlight 'me' with thicker stroke
+                                        g.lineStyle(isMe ? 3 : 2, player.color, 1);
+                                        g.drawCircle(0, 0, 15);
+                                    }}
+                                />
+                            )}
+                            {player.name && (
+                                <Text
+                                    text={player.name}
+                                    anchor={0.5}
+                                    y={isSpectator ? 0 : -25} // Center name if spectator, otherwise above sprite
+                                    style={new PIXI.TextStyle({
+                                        fill: '#ffffff',
+                                        fontSize: 14,
+                                        stroke: '#000000',
+                                        strokeThickness: 4,
+                                        alpha: isSpectator ? 0.6 : 1 // Slightly transparent for spectators maybe? Or user said "white". Let's keep 1.
+                                    })}
+                                />
+                            )}
+                        </Container>
+                    );
+                })}
             </Container>
         </Stage>
     );

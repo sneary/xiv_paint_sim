@@ -4,7 +4,7 @@ export interface Player {
     y: number;
     color: number; // Hex color for paint/ring
     name: string;
-    role: 'tank' | 'healer' | 'dps';
+    role: 'tank' | 'healer' | 'dps' | 'spectator';
 }
 
 export interface ArenaConfig {

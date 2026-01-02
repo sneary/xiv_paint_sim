@@ -268,6 +268,16 @@ body {
   color: #d0021b;
 }
 
+.role-option.spectator {
+  border-color: #888;
+  color: #aaa;
+}
+
+.role-option.spectator:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
 .role-option.selected {
   background: rgba(255, 255, 255, 0.1);
   box-shadow: 0 0 10px currentColor;

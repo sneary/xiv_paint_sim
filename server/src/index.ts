@@ -29,9 +29,23 @@ io.on('connection', (socket) => {
 
     // gameState.players[socket.id] = { ... } -- Removed auto-spawn
 
-    io.emit('stateUpdate', gameState);
+    socket.on('joinGame', (data: { name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => {
+        // Validation
+        const players = Object.values(gameState.players);
+        const nameTaken = players.some(p => p.name.toLowerCase() === data.name.toLowerCase());
+        if (nameTaken) {
+            socket.emit('joinError', 'Name is already taken');
+            return;
+        }
 
-    socket.on('joinGame', (data: { name: string, color: number, role: 'tank' | 'healer' | 'dps' }) => {
+        if (data.role !== 'spectator') {
+            const colorTaken = players.some(p => p.role !== 'spectator' && p.color === data.color);
+            if (colorTaken) {
+                socket.emit('joinError', 'Color is already taken');
+                return;
+            }
+        }
+
         gameState.players[socket.id] = {
             id: socket.id,
             x: 400,
