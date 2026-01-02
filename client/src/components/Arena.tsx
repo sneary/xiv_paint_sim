@@ -52,7 +52,7 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                             if (strokes.length > 0) {
                                 // console.log(`[RENDER] Drawing ${strokes.length} strokes`);
                             }
-                            strokes.forEach((stroke, idx) => {
+                            strokes.forEach((stroke) => {
                                 if (!stroke || !stroke.points || stroke.points.length < 2) return;
                                 // Ensure color is a number
                                 const color = typeof stroke.color === 'number' ? stroke.color : parseInt(stroke.color as any, 16) || 0xffffff;
