@@ -7,6 +7,7 @@ import ConfigMenu from './components/ConfigMenu';
 import type { GameState, ArenaConfig } from './types';
 
 import LandingPage from './components/LandingPage';
+import PartyList from './components/PartyList';
 
 // In production (Single Service), we want to connect to the same origin (relative path)
 // If VITE_SOCKET_URL is set (e.g. for split hosting), use that.
@@ -471,10 +472,19 @@ function App() {
       )}
 
       {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>}
+      import PartyList from './components/PartyList';
+
+      // ... (existing imports)
+
+      // ... (inside App component return)
+
       <div style={{ color: '#aaa', marginBottom: '1rem', fontSize: isMobile ? '0.8rem' : '1rem' }}>
         {myId ? `Connected as ${gameState.players[myId]?.name || myId}` : 'Connecting...'}
         {!isMobile && <><br />Use W/A/S/D to move. Press Space to Honk. Click and drag in arena to paint.</>}
       </div>
+
+      <PartyList players={gameState.players} myId={myId} />
+
       <Arena
         players={gameState.players}
         myId={myId}
