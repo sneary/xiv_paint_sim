@@ -11,9 +11,10 @@ interface ArenaProps {
     onStrokeMove: (x: number, y: number) => void;
     onStrokeEnd: () => void;
     scale?: number;
+    honkingPlayers?: Record<string, number>;
 }
 
-const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1 }: ArenaProps) => {
+const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1, honkingPlayers = {} }: ArenaProps) => {
     return (
         <Stage
             width={800 * scale}
@@ -94,6 +95,8 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                 {/* Players */}
                 {Object.values(players).map((player) => {
                     const isSpectator = player.role === 'spectator';
+                    const isHonking = !!honkingPlayers[player.id];
+
                     return (
                         <Container key={player.id} x={player.x} y={player.y}>
                             {!isSpectator && (
@@ -108,7 +111,12 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                                             dps: 0xd0021b
                                             // spectator handled above
                                         };
-                                        const baseColor = (roleColors as any)[player.role] || 0xd0021b;
+                                        let baseColor = (roleColors as any)[player.role] || 0xd0021b;
+
+                                        if (isHonking) {
+                                            // Invert Color
+                                            baseColor = 0xFFFFFF ^ baseColor;
+                                        }
 
                                         g.beginFill(baseColor);
                                         g.drawCircle(0, 0, 10); // Player hitbox
@@ -116,7 +124,7 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
 
                                         // Ring uses the player's selected paint color
                                         // Highlight 'me' with thicker stroke
-                                        g.lineStyle(isMe ? 3 : 2, player.color, 1);
+                                        g.lineStyle(isMe ? 3 : 2, isHonking ? (0xFFFFFF ^ player.color) : player.color, 1);
                                         g.drawCircle(0, 0, 15);
                                     }}
                                 />

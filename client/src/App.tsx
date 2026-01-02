@@ -76,6 +76,35 @@ function App() {
     joystickRef.current = null;
   };
 
+  // Honk State
+  const [honkingPlayers, setHonkingPlayers] = useState<Record<string, number>>({});
+  const audioCtxRef = useRef<AudioContext | null>(null);
+
+  const playHonk = () => {
+    if (!audioCtxRef.current) {
+      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    const ctx = audioCtxRef.current;
+    if (ctx.state === 'suspended') ctx.resume();
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, ctx.currentTime); // Low pitch
+    osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.1);
+
+    gain.gain.setValueAtTime(0.5, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.2);
+  };
+
+  // Socket Events
   useEffect(() => {
     const socket = io(SOCKET_URL);
     socketRef.current = socket;
@@ -88,19 +117,15 @@ function App() {
     socket.on('stateUpdate', (newState: GameState) => {
       setGameState(prevState => {
         const myId = socketRef.current?.id;
-        // If we have a local position for ourselves, keep it (Client Prediction)
-        // Otherwise, accept server state
         if (myId && prevState.players[myId] && newState.players[myId]) {
-          // Create a merged state where WE stay where we are locally
-          // This prevents rubber-banding when the server echoes back our old position
           return {
             ...newState,
             players: {
               ...newState.players,
               [myId]: {
-                ...newState.players[myId], // Keep server props like color/role
-                x: prevState.players[myId].x, // Keep local X
-                y: prevState.players[myId].y  // Keep local Y
+                ...newState.players[myId],
+                x: prevState.players[myId].x,
+                y: prevState.players[myId].y
               }
             }
           };
@@ -110,8 +135,22 @@ function App() {
     });
 
     socket.on('joinError', (msg: string) => {
-      alert(msg); // Simple alert for now, or pass check to LandingPage
+      alert(msg);
       setHasJoined(false);
+    });
+
+    socket.on('honk', (id: string) => {
+      playHonk();
+      // Trigger visual effect
+      setHonkingPlayers(prev => ({ ...prev, [id]: Date.now() }));
+      // Clear effect after 200ms
+      setTimeout(() => {
+        setHonkingPlayers(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }, 200);
     });
 
     return () => {
@@ -123,6 +162,9 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       keysPressed.current[e.key.toLowerCase()] = true;
+      if (e.key === ' ' && !e.repeat) {
+        socketRef.current?.emit('honk');
+      }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       keysPressed.current[e.key.toLowerCase()] = false;
@@ -460,6 +502,7 @@ function App() {
         onStrokeMove={moveStroke}
         onStrokeEnd={endStroke}
         scale={scale}
+        honkingPlayers={honkingPlayers}
       />
     </div>
   );
