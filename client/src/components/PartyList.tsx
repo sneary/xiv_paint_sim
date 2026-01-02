@@ -22,7 +22,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 const PartyList: React.FC<PartyListProps> = ({ players, myId }) => {
     const sortedPlayers = useMemo(() => {
-        const list = Object.values(players);
+        const list = Object.values(players).filter(p => p.role !== 'spectator');
 
         return list.sort((a, b) => {
             // 1. "Me" at the top
