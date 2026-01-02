@@ -170,7 +170,19 @@ function App() {
   }, [gameState]);
 
   useEffect(() => {
-    const loop = setInterval(() => {
+    let animationFrameId: number;
+    let lastTime = performance.now();
+
+    const loop = () => {
+      animationFrameId = requestAnimationFrame(loop);
+
+      const currentTime = performance.now();
+      const dt = currentTime - lastTime;
+      lastTime = currentTime;
+
+      // Cap dt to prevent huge jumps if tab was inactive
+      const safeDt = Math.min(dt, 100);
+
       if (!socketRef.current) return;
 
       const keys = keysPressed.current;
@@ -187,20 +199,22 @@ function App() {
 
       let dx = 0;
       let dy = 0;
-      const speed = 5;
+      // Previous: 5px per 20ms = 250px per second
+      const SPEED_PER_SEC = 250;
+      const moveAmount = SPEED_PER_SEC * (safeDt / 1000);
 
-      if (keys['w']) dy -= speed;
-      if (keys['s']) dy += speed;
-      if (keys['a']) dx -= speed;
-      if (keys['d']) dx += speed;
+      if (keys['w']) dy -= moveAmount;
+      if (keys['s']) dy += moveAmount;
+      if (keys['a']) dx -= moveAmount;
+      if (keys['d']) dx += moveAmount;
 
       // Joystick override
       if (joystickRef.current) {
         const jx = joystickRef.current.x;
         const jy = joystickRef.current.y;
         // User confirmed values are -1 to 1.
-        dx += jx * speed;
-        dy -= jy * speed; // Joystick Y is inverted relative to screen coords
+        dx += jx * moveAmount;
+        dy -= jy * moveAmount; // Joystick Y is inverted relative to screen coords
       }
 
       if (dx !== 0 || dy !== 0) {
@@ -229,12 +243,16 @@ function App() {
           }
         }));
 
-        // 2. Send to Server
+        // 2. Send to Server (Throttle this? For now, per frame movement emit might be high load but smoothest)
+        // Optimization: Could throttle network sends to 20-30hz while simulating locally at high FPS.
+        // For simple MVP, sending every frame is OK for local/LAN, but we should consider throttling.
         socket.emit('move', { x: newX, y: newY });
       }
-    }, 20); // Increased tick rate slightly for smoother local feel (50fps)
+    };
 
-    return () => clearInterval(loop);
+    loop();
+
+    return () => cancelAnimationFrame(animationFrameId);
   }, []);
 
   const myId = socketRef.current?.id;
