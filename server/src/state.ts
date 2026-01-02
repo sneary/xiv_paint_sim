@@ -2,9 +2,9 @@ export interface Player {
     id: string;
     x: number;
     y: number;
+    color: number; // Hex color for paint/ring
+    name: string;
     role: 'tank' | 'healer' | 'dps';
-    name?: string;
-    color?: number;
 }
 
 export interface ArenaConfig {

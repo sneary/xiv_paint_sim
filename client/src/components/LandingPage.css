@@ -235,6 +235,45 @@ body {
   }
 }
 
+
+/* Role Selector */
+.role-option {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.3);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.role-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.role-option.tank {
+  border-color: #4a90e2;
+  color: #4a90e2;
+}
+
+.role-option.healer {
+  border-color: #7ed321;
+  color: #7ed321;
+}
+
+.role-option.dps {
+  border-color: #d0021b;
+  color: #d0021b;
+}
+
+.role-option.selected {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 10px currentColor;
+  border-width: 2px;
+}
+
 @media (max-width: 480px) {
   .main-title {
     font-size: 2rem;

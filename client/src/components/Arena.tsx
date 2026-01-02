@@ -97,16 +97,22 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                         <Graphics
                             draw={(g: PIXI.Graphics) => {
                                 g.clear();
-                                // Draw player
                                 const isMe = player.id === myId;
-                                const color = player.color || (isMe ? 0x00ff00 : 0xff0000);
+                                // Role Colors
+                                const roleColors = {
+                                    tank: 0x4a90e2,
+                                    healer: 0x7ed321,
+                                    dps: 0xd0021b
+                                };
+                                const baseColor = roleColors[player.role] || 0xd0021b; // Default DPS red
 
-                                g.beginFill(color);
+                                g.beginFill(baseColor);
                                 g.drawCircle(0, 0, 10); // Player hitbox
                                 g.endFill();
 
-                                // Ring (Me highlight)
-                                g.lineStyle(isMe ? 3 : 2, 0xffffff, 0.8);
+                                // Ring uses the player's selected paint color
+                                // Highlight 'me' with thicker stroke
+                                g.lineStyle(isMe ? 3 : 2, player.color, 1);
                                 g.drawCircle(0, 0, 15);
                             }}
                         />

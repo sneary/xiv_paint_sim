@@ -31,14 +31,14 @@ io.on('connection', (socket) => {
 
     io.emit('stateUpdate', gameState);
 
-    socket.on('joinGame', (data: { name: string, color: number }) => {
+    socket.on('joinGame', (data: { name: string, color: number, role: 'tank' | 'healer' | 'dps' }) => {
         gameState.players[socket.id] = {
             id: socket.id,
             x: 400,
             y: 300,
-            role: 'dps',
+            color: data.color || 0xffffff,
             name: data.name,
-            color: data.color
+            role: data.role || 'dps'
         };
         io.emit('stateUpdate', gameState);
     });

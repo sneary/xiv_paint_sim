@@ -2,7 +2,7 @@ import { useState } from 'react';
 import './LandingPage.css';
 
 interface LandingPageProps {
-    onJoin: (name: string, color: number) => void;
+    onJoin: (name: string, color: number, role: 'tank' | 'healer' | 'dps') => void;
 }
 
 const COLORS = [
@@ -13,11 +13,12 @@ const COLORS = [
 const LandingPage = ({ onJoin }: LandingPageProps) => {
     const [name, setName] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLORS[0]);
+    const [selectedRole, setSelectedRole] = useState<'tank' | 'healer' | 'dps'>('dps');
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (name.trim()) {
-            onJoin(name, selectedColor);
+            onJoin(name, selectedColor, selectedRole);
         }
     };
 
@@ -45,7 +46,31 @@ const LandingPage = ({ onJoin }: LandingPageProps) => {
                         </div>
 
                         <div className="form-group">
-                            <label className="form-label">Sprite Color</label>
+                            <label className="form-label">Role (Main Color)</label>
+                            <div className="role-selector" style={{ display: 'flex', gap: '10px' }}>
+                                <div
+                                    className={`role-option tank ${selectedRole === 'tank' ? 'selected' : ''}`}
+                                    onClick={() => setSelectedRole('tank')}
+                                >
+                                    Tank
+                                </div>
+                                <div
+                                    className={`role-option healer ${selectedRole === 'healer' ? 'selected' : ''}`}
+                                    onClick={() => setSelectedRole('healer')}
+                                >
+                                    Healer
+                                </div>
+                                <div
+                                    className={`role-option dps ${selectedRole === 'dps' ? 'selected' : ''}`}
+                                    onClick={() => setSelectedRole('dps')}
+                                >
+                                    DPS
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="form-group">
+                            <label className="form-label">Ring & Paint Color</label>
                             <div className="color-grid">
                                 {COLORS.map(color => (
                                     <div

@@ -232,9 +232,9 @@ function App() {
     socketRef.current?.emit('endStroke');
   };
 
-  const handleJoin = (name: string, color: number) => {
+  const handleJoin = (name: string, color: number, role: 'tank' | 'healer' | 'dps') => {
     if (socketRef.current) {
-      socketRef.current.emit('joinGame', { name, color });
+      socketRef.current.emit('joinGame', { name, color, role });
       setSelectedColor(color);
       setHasJoined(true);
     }
