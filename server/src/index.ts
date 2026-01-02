@@ -108,6 +108,11 @@ io.on('connection', (socket) => {
         io.emit('stateUpdate', gameState);
     });
 
+    socket.on('honk', () => {
+        // Broadcast honk to all players (including sender) to sync sound/effect
+        io.emit('honk', socket.id);
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         delete gameState.players[socket.id];
