@@ -352,7 +352,7 @@ function App() {
       </div>
 
       {/* Party List and Debuff Button Container */}
-      <div style={{ position: 'absolute', top: 150, left: 20, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+      <div style={{ position: 'absolute', top: 170, left: 20, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
         <PartyList players={gameState.players} myId={myId} />
 
         <button

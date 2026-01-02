@@ -30,14 +30,26 @@ const ConfigMenu = ({ config, onUpdate }: ConfigMenuProps) => {
                 </select>
             </div>
 
-            <div>
-                {config.shape === 'circle' ? (
-                    // Maybe add diameter slider in future
-                    <div style={{ fontSize: '0.8rem', color: '#aaa' }}>Radius: {config.width / 2}</div>
-                ) : (
-                    <div style={{ fontSize: '0.8rem', color: '#aaa' }}>Size: {config.width}x{config.height}</div>
-                )}
+            <div style={{ marginBottom: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                        type="checkbox"
+                        checked={!!config.showGrid}
+                        onChange={(e) => onUpdate({ showGrid: e.target.checked })}
+                        style={{ marginRight: '10px' }}
+                    />
+                    Show Gridlines
+                </label>
             </div>
+
+            {/* <div style={{ fontSize: '0.8rem', color: '#aaa' }}>
+                {config.shape === 'circle' ? (
+                     `Radius: ${config.width / 2}`
+                ) : (
+                     `Size: ${config.width}x${config.height}`
+                )} 
+            </div> */ // Commenting out or simply removing the whole block is better.
+            }
         </div>
     );
 };

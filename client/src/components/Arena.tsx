@@ -79,6 +79,9 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                     draw={(g: PIXI.Graphics) => {
                         // Start fresh
                         g.clear();
+
+                        // Draw Floor
+                        // g.beginFill(0xffffff); // Removed to keep original color (background)
                         g.lineStyle(2, 0x444444);
 
                         if (config.shape === 'circle') {
@@ -88,6 +91,44 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                             const halfW = config.width / 2;
                             const halfH = config.height / 2;
                             g.drawRect(400 - halfW, 300 - halfH, config.width, config.height);
+                        }
+                        // g.endFill(); // Removed
+
+                        // Draw Grid
+                        if (config.showGrid) {
+                            g.lineStyle(1, 0xFFFFFF, 0.1); // Very faint white
+                            const step = 50;
+                            const r = config.width / 2;
+
+                            if (config.shape === 'square') {
+                                const halfW = config.width / 2;
+                                const halfH = config.height / 2;
+
+                                // Verticals (centered at 400)
+                                for (let x = -halfW + step; x < halfW; x += step) {
+                                    g.moveTo(400 + x, 300 - halfH);
+                                    g.lineTo(400 + x, 300 + halfH);
+                                }
+                                // Horizontals (centered at 300)
+                                for (let y = -halfH + step; y < halfH; y += step) {
+                                    g.moveTo(400 - halfW, 300 + y);
+                                    g.lineTo(400 + halfW, 300 + y);
+                                }
+                            } else {
+                                // Circle
+                                // Verticals
+                                for (let x = -r + step; x < r; x += step) {
+                                    const limit = Math.sqrt(r * r - x * x);
+                                    g.moveTo(400 + x, 300 - limit);
+                                    g.lineTo(400 + x, 300 + limit);
+                                }
+                                // Horizontals
+                                for (let y = -r + step; y < r; y += step) {
+                                    const limit = Math.sqrt(r * r - y * y);
+                                    g.moveTo(400 - limit, 300 + y);
+                                    g.lineTo(400 + limit, 300 + y);
+                                }
+                            }
                         }
                     }}
                 />
