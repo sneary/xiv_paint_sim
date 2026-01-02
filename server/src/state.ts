@@ -5,6 +5,7 @@ export interface Player {
     color: number; // Hex color for paint/ring
     name: string;
     role: 'tank' | 'healer' | 'dps' | 'spectator';
+    debuffs: number[];
 }
 
 export interface ArenaConfig {

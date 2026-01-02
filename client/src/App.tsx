@@ -8,6 +8,7 @@ import type { GameState, ArenaConfig } from './types';
 
 import LandingPage from './components/LandingPage';
 import PartyList from './components/PartyList';
+import DebuffMenu from './components/DebuffMenu';
 
 // In production (Single Service), we want to connect to the same origin (relative path)
 // If VITE_SOCKET_URL is set (e.g. for split hosting), use that.
@@ -293,7 +294,17 @@ function App() {
     }
   };
 
+  // Debuff Menu State
+  const [showDebuffMenu, setShowDebuffMenu] = useState(false);
+
+  const handleApplyDebuffs = (updates: Record<string, number[]>) => {
+    if (socketRef.current) {
+      socketRef.current.emit('updateDebuffs', updates);
+    }
+  };
+
   if (!hasJoined) {
+    // ... no change to this logic, just ensuring context
     const playersList = Object.values(gameState.players);
     const takenNames = playersList.map(p => p.name);
     const takenColors = playersList
@@ -305,6 +316,48 @@ function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#111' }}>
+
+      {/* ... (Config Toggle, Menu, Joystick, Tools Toggle, Color Picker) code omitted for brevity in search, focusing on insertion point */}
+
+      {/* Debuff Menu Overlay */}
+      {showDebuffMenu && (
+        <DebuffMenu
+          players={gameState.players}
+          onApply={handleApplyDebuffs}
+          onClose={() => setShowDebuffMenu(false)}
+        />
+      )}
+
+      {/* Existing Config Menu Logic... handled above in code flow but visual placement next */}
+
+      {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>}
+
+      <div style={{ color: '#aaa', marginBottom: '1rem', fontSize: isMobile ? '0.8rem' : '1rem' }}>
+        {myId ? `Connected as ${gameState.players[myId]?.name || myId}` : 'Connecting...'}
+        {!isMobile && <><br />Use W/A/S/D to move. Press Space to Honk. Click and drag in arena to paint.</>}
+      </div>
+
+      {/* Party List and Debuff Button Container */}
+      <div style={{ position: 'absolute', top: 150, left: 20, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+        <PartyList players={gameState.players} myId={myId} />
+
+        <button
+          onClick={() => setShowDebuffMenu(true)}
+          style={{
+            background: '#333',
+            border: '1px solid #555',
+            color: '#eee',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontFamily: "'Outfit', sans-serif",
+            fontSize: '12px',
+            width: '100%' // Match Party List width roughly
+          }}
+        >
+          Set Debuffs
+        </button>
+      </div>
 
       {/* Config Menu Toggle (Mobile) */}
       {isMobile && !showConfig && (
@@ -472,11 +525,7 @@ function App() {
       )}
 
       {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>}
-      import PartyList from './components/PartyList';
 
-      // ... (existing imports)
-
-      // ... (inside App component return)
 
       <div style={{ color: '#aaa', marginBottom: '1rem', fontSize: isMobile ? '0.8rem' : '1rem' }}>
         {myId ? `Connected as ${gameState.players[myId]?.name || myId}` : 'Connecting...'}

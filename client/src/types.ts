@@ -5,6 +5,7 @@ export interface Player {
     role: 'tank' | 'healer' | 'dps' | 'spectator';
     name: string;
     color: number;
+    debuffs: number[];
 }
 
 export interface ArenaConfig {

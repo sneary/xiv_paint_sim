@@ -52,7 +52,8 @@ io.on('connection', (socket) => {
             y: 300,
             color: data.color || 0xffffff,
             name: data.name,
-            role: data.role || 'dps'
+            role: data.role || 'dps',
+            debuffs: []
         };
         io.emit('stateUpdate', gameState);
     });
@@ -111,6 +112,15 @@ io.on('connection', (socket) => {
     socket.on('honk', () => {
         // Broadcast honk to all players (including sender) to sync sound/effect
         io.emit('honk', socket.id);
+    });
+
+    socket.on('updateDebuffs', (updates: Record<string, number[]>) => {
+        Object.entries(updates).forEach(([playerId, debuffs]) => {
+            if (gameState.players[playerId]) {
+                gameState.players[playerId].debuffs = debuffs;
+            }
+        });
+        io.emit('stateUpdate', gameState);
     });
 
     socket.on('disconnect', () => {
