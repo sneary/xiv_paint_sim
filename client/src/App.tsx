@@ -406,8 +406,8 @@ function App() {
           transform: 'translate(-50%, -50%)',
           fontSize: '8rem',
           fontWeight: 'bold',
-          color: '#fff',
-          textShadow: '0 0 20px #000',
+          color: '#FFD700', // Gold
+          textShadow: '0 0 20px #000, 2px 2px 0px #000',
           fontFamily: "'Outfit', sans-serif",
           pointerEvents: 'none',
           zIndex: 1000
