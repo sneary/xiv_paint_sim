@@ -80,28 +80,48 @@ function App() {
   const [honkingPlayers, setHonkingPlayers] = useState<Record<string, number>>({});
   const audioCtxRef = useRef<AudioContext | null>(null);
 
-  const playHonk = () => {
+  const playHonk = async () => {
     if (!audioCtxRef.current) {
       audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
     const ctx = audioCtxRef.current;
     if (ctx.state === 'suspended') ctx.resume();
 
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
+    try {
+      // Try to load honk.mp3
+      const response = await fetch('/honk.mp3');
+      if (response.ok) {
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+        const source = ctx.createBufferSource();
+        source.buffer = audioBuffer;
+        const gain = ctx.createGain();
+        gain.gain.value = 0.2; // 20% volume for file
 
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(250, ctx.currentTime); // Higher start pitch for audibility
-    osc.frequency.exponentialRampToValueAtTime(150, ctx.currentTime + 0.2);
+        source.connect(gain);
+        gain.connect(ctx.destination);
+        source.start();
+      } else {
+        throw new Error('File not found');
+      }
+    } catch (e) {
+      // Fallback to Synth
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    gain.gain.setValueAtTime(0.8, ctx.currentTime); // Louder (was 0.5)
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2); // Slower fade
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(200, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.2);
 
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+      gain.gain.setValueAtTime(0.1, ctx.currentTime); // 10% volume for synth (half of 0.2)
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
 
-    osc.start();
-    osc.stop(ctx.currentTime + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.25);
+    }
   };
 
   // Socket Events
