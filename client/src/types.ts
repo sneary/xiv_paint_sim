@@ -12,6 +12,7 @@ export interface ArenaConfig {
     shape: 'circle' | 'square';
     width: number;
     height: number;
+    showGrid?: boolean;
 }
 
 export interface Point {

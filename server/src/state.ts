@@ -12,6 +12,7 @@ export interface ArenaConfig {
     shape: 'circle' | 'square';
     width: number;
     height: number;
+    showGrid?: boolean;
 }
 
 export interface Point {
@@ -39,6 +40,7 @@ export const initialState: GameState = {
         shape: 'circle',
         width: 500,
         height: 500,
+        showGrid: false
     },
     strokes: [],
 };
