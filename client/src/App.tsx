@@ -357,6 +357,30 @@ function App() {
         >
           Set Debuffs
         </button>
+        <button
+          onClick={() => {
+            if (socketRef.current) {
+              const updates: Record<string, number[]> = {};
+              Object.keys(gameState.players).forEach(id => {
+                updates[id] = [];
+              });
+              socketRef.current.emit('updateDebuffs', updates);
+            }
+          }}
+          style={{
+            background: '#d9534f',
+            border: '1px solid #d43f3a',
+            color: 'white',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontFamily: "'Outfit', sans-serif",
+            fontSize: '12px',
+            width: '100%'
+          }}
+        >
+          Clear Debuffs
+        </button>
       </div>
 
       {/* Config Menu Toggle (Mobile) */}

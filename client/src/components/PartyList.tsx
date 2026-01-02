@@ -87,7 +87,9 @@ const PartyList: React.FC<PartyListProps> = ({ players, myId }) => {
                             backgroundColor: isMe ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
                             padding: '4px',
                             borderRadius: '3px',
-                            borderLeft: `3px solid ${ROLE_COLORS[player.role] || '#fff'}`
+                            borderLeft: `3px solid ${ROLE_COLORS[player.role] || '#fff'}`,
+                            position: 'relative', // Needed for absolute positioning of debuffs
+                            overflow: 'visible'   // Ensure debuffs aren't clipped
                         }}
                     >
                         {/* Simple Role Indicator Icon could go here, for now just Color Bar */}
@@ -113,6 +115,32 @@ const PartyList: React.FC<PartyListProps> = ({ players, myId }) => {
                         }}>
                             {player.role.substring(0, 3)}
                         </span>
+
+                        {/* Debuffs */}
+                        {player.debuffs && player.debuffs.length > 0 && (
+                            <div style={{
+                                display: 'flex',
+                                gap: '4px',
+                                position: 'absolute',
+                                left: '100%',
+                                top: '50%',
+                                transform: 'translateY(-50%)',
+                                marginLeft: '10px'
+                            }}>
+                                {player.debuffs.map((color, i) => (
+                                    <div
+                                        key={i}
+                                        style={{
+                                            width: '12px',
+                                            height: '12px',
+                                            borderRadius: '50%',
+                                            backgroundColor: '#' + color.toString(16).padStart(6, '0'),
+                                            border: '1px solid #000'
+                                        }}
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
             })}
