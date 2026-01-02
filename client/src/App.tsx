@@ -337,7 +337,7 @@ function App() {
 
       {/* Mobile Joystick - Bottom Left */}
       {isMobile && (
-        <div style={{ position: 'absolute', bottom: 30, left: 30, zIndex: 200 }}>
+        <div style={{ position: 'absolute', bottom: 80, left: 80, zIndex: 200 }}>
           <Joystick
             size={100}
             sticky={false}
