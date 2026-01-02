@@ -2,9 +2,15 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
 
 const app = express();
 app.use(cors());
+
+// Serve static files from the client build
+// In production (dist/index.js), this goes up two levels to find client/dist
+const clientDistPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientDistPath));
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -93,6 +99,11 @@ io.on('connection', (socket) => {
         delete gameState.players[socket.id];
         io.emit('stateUpdate', gameState);
     });
+});
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../../client/dist/index.html'));
 });
 
 const PORT = process.env.PORT || 3001;
