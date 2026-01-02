@@ -296,12 +296,26 @@ function App() {
 
   // Debuff Menu State
   const [showDebuffMenu, setShowDebuffMenu] = useState(false);
+  const [countdown, setCountdown] = useState<string | null>(null);
 
   const handleApplyDebuffs = (updates: Record<string, number[]>) => {
     if (socketRef.current) {
-      socketRef.current.emit('updateDebuffs', updates);
+      // Use the new countdown event instead of immediate update
+      socketRef.current.emit('startDebuffCountdown', updates);
     }
   };
+
+  useEffect(() => {
+    if (!socketRef.current) return;
+
+    socketRef.current.on('countdown', (text: string | null) => {
+      setCountdown(text);
+    });
+
+    return () => {
+      socketRef.current?.off('countdown');
+    };
+  }, [socketRef.current]);
 
   if (!hasJoined) {
     // ... no change to this logic, just ensuring context
@@ -382,6 +396,25 @@ function App() {
           Clear Debuffs
         </button>
       </div>
+
+      {/* Countdown Overlay */}
+      {countdown && (
+        <div style={{
+          position: 'absolute',
+          top: '30%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          fontSize: '8rem',
+          fontWeight: 'bold',
+          color: '#fff',
+          textShadow: '0 0 20px #000',
+          fontFamily: "'Outfit', sans-serif",
+          pointerEvents: 'none',
+          zIndex: 1000
+        }}>
+          {countdown}
+        </div>
+      )}
 
       {/* Config Menu Toggle (Mobile) */}
       {isMobile && !showConfig && (

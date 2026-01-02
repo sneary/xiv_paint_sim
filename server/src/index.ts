@@ -114,6 +114,35 @@ io.on('connection', (socket) => {
         io.emit('honk', socket.id);
     });
 
+    socket.on('startDebuffCountdown', (updates: Record<string, number[]>) => {
+        // 3
+        io.emit('countdown', '3');
+        setTimeout(() => {
+            // 2
+            io.emit('countdown', '2');
+            setTimeout(() => {
+                // 1
+                io.emit('countdown', '1');
+                setTimeout(() => {
+                    // START - Apply Changes
+                    Object.entries(updates).forEach(([playerId, debuffs]) => {
+                        if (gameState.players[playerId]) {
+                            gameState.players[playerId].debuffs = debuffs;
+                        }
+                    });
+
+                    io.emit('stateUpdate', gameState);
+                    io.emit('countdown', 'START');
+
+                    // Clear countdown text after 1s
+                    setTimeout(() => {
+                        io.emit('countdown', null);
+                    }, 1000);
+                }, 1000);
+            }, 1000);
+        }, 1000);
+    });
+
     socket.on('updateDebuffs', (updates: Record<string, number[]>) => {
         Object.entries(updates).forEach(([playerId, debuffs]) => {
             if (gameState.players[playerId]) {
