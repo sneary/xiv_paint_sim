@@ -271,7 +271,7 @@ function App() {
 
       {/* Config Menu */}
       {(showConfig || !isMobile) && (
-        <div style={isMobile ? { position: 'absolute', top: 20, left: 20, zIndex: 120 } : {}}>
+        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 120 }}>
           <div style={{ position: 'relative' }}>
             <ConfigMenu config={gameState.config} onUpdate={handleConfigUpdate} />
             {isMobile && (

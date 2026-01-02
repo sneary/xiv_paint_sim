@@ -8,9 +8,6 @@ interface ConfigMenuProps {
 const ConfigMenu = ({ config, onUpdate }: ConfigMenuProps) => {
     return (
         <div style={{
-            position: 'absolute',
-            top: 20,
-            left: 20,
             backgroundColor: 'rgba(30, 30, 30, 0.9)',
             padding: '1rem',
             borderRadius: '8px',
