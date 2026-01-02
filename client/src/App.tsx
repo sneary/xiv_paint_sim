@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import io, { Socket } from 'socket.io-client';
+import { Joystick } from 'react-joystick-component';
 import './App.css';
 import Arena from './components/Arena';
 import ConfigMenu from './components/ConfigMenu';
@@ -25,6 +26,28 @@ function App() {
 
   // Movement state
   const keysPressed = useRef<Record<string, boolean>>({});
+
+  // Joystick state
+  const joystickRef = useRef<{ x: number, y: number } | null>(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleJoystickMove = (event: any) => {
+    if (event.x !== undefined && event.y !== undefined) {
+      joystickRef.current = { x: event.x, y: event.y };
+    } else {
+      joystickRef.current = null;
+    }
+  };
+
+  const handleJoystickStop = () => {
+    joystickRef.current = null;
+  };
 
   useEffect(() => {
     const socket = io(SOCKET_URL);
@@ -113,6 +136,16 @@ function App() {
       if (keys['a']) dx -= speed;
       if (keys['d']) dx += speed;
 
+      // Joystick override
+      if (joystickRef.current) {
+        // Joystick x/y are roughly -50 to 50 based on size 100
+        const jx = joystickRef.current.x;
+        const jy = joystickRef.current.y;
+        // Normalize to speed (max throw is roughly 50)
+        dx += (jx / 50) * speed;
+        dy -= (jy / 50) * speed; // Joystick Y is inverted relative to screen coords
+      }
+
       if (dx !== 0 || dy !== 0) {
         const newX = me.x + dx;
         const newY = me.y + dy;
@@ -199,6 +232,20 @@ function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#111' }}>
       <ConfigMenu config={gameState.config} onUpdate={handleConfigUpdate} />
+
+      {/* Mobile Joystick - Bottom Left */}
+      {isMobile && (
+        <div style={{ position: 'absolute', bottom: 30, left: 30, zIndex: 200 }}>
+          <Joystick
+            size={100}
+            sticky={false}
+            baseColor="#333"
+            stickColor="#555"
+            move={handleJoystickMove}
+            stop={handleJoystickStop}
+          />
+        </div>
+      )}
 
       {/* Color Picker UI */}
       <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(30,30,30,0.9)', padding: '15px', borderRadius: '8px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '10px' }}>
