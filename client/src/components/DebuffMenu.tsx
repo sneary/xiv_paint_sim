@@ -101,6 +101,8 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
                 >
                     Cancel
                 </button>
+                <div style={{ flex: 1 }}></div>
+
                 <button
                     onClick={handleConfirm}
                     style={{

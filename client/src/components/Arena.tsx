@@ -129,6 +129,31 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                                     }}
                                 />
                             )}
+
+                            {/* Debuffs - Render above Name */}
+                            {player.debuffs && player.debuffs.length > 0 && (
+                                <Container x={0} y={isSpectator ? -20 : -45}>
+                                    {player.debuffs.map((color, i) => {
+                                        const count = player.debuffs.length;
+                                        const spacing = 12;
+                                        const startX = -((count - 1) * spacing) / 2;
+                                        return (
+                                            <Graphics
+                                                key={i}
+                                                x={startX + i * spacing}
+                                                draw={(g) => {
+                                                    g.clear();
+                                                    g.beginFill(color);
+                                                    g.lineStyle(1, 0x000000);
+                                                    g.drawCircle(0, 0, 5);
+                                                    g.endFill();
+                                                }}
+                                            />
+                                        );
+                                    })}
+                                </Container>
+                            )}
+
                             {player.name && (
                                 <Text
                                     text={player.name}
