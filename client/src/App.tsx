@@ -31,9 +31,32 @@ function App() {
   const joystickRef = useRef<{ x: number, y: number } | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
+  // UI Visibility (Collapsed by default on mobile)
+  const [showConfig, setShowConfig] = useState(!isMobile);
+  const [showTools, setShowTools] = useState(!isMobile);
+  const [scale, setScale] = useState(1);
+
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (!mobile) {
+        // Force show on desktop if resized larger
+        setShowConfig(true);
+        setShowTools(true);
+      }
+
+      // Calculate Scale
+      // Base size is 800x600.
+      // We want some padding.
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const s = Math.min(w / 800, (h - 50) / 600); // -50 for header
+      setScale(s < 1 ? s : 1);
+    };
+
     window.addEventListener('resize', handleResize);
+    handleResize(); // Init
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -232,7 +255,36 @@ function App() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#111' }}>
-      <ConfigMenu config={gameState.config} onUpdate={handleConfigUpdate} />
+
+      {/* Config Menu Toggle (Mobile) */}
+      {isMobile && !showConfig && (
+        <button
+          onClick={() => setShowConfig(true)}
+          style={{
+            position: 'absolute', top: 20, left: 20, zIndex: 110,
+            background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
+          }}
+        >
+          ⚙️
+        </button>
+      )}
+
+      {/* Config Menu */}
+      {(showConfig || !isMobile) && (
+        <div style={isMobile ? { position: 'absolute', top: 20, left: 20, zIndex: 120 } : {}}>
+          <div style={{ position: 'relative' }}>
+            <ConfigMenu config={gameState.config} onUpdate={handleConfigUpdate} />
+            {isMobile && (
+              <button
+                onClick={() => setShowConfig(false)}
+                style={{ position: 'absolute', top: -10, right: -10, background: 'red', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer' }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Mobile Joystick - Bottom Left */}
       {isMobile && (
@@ -248,103 +300,126 @@ function App() {
         </div>
       )}
 
+      {/* Tools Toggle (Mobile) */}
+      {isMobile && !showTools && (
+        <button
+          onClick={() => setShowTools(true)}
+          style={{
+            position: 'absolute', top: 20, right: 20, zIndex: 110,
+            background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
+          }}
+        >
+          🎨
+        </button>
+      )}
+
       {/* Color Picker UI */}
-      <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(30,30,30,0.9)', padding: '15px', borderRadius: '8px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-
-        {/* Color Grid */}
-        <div>
-          <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Paint Color</h3>
-          <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '150px' }}>
-            {[0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0x000000].map(color => (
-              <div
-                key={color}
-                onClick={() => {
-                  setTool('brush');
-                  setSelectedColor(color);
-                }}
-                style={{
-                  width: '30px',
-                  height: '30px',
-                  backgroundColor: '#' + color.toString(16).padStart(6, '0'),
-                  border: (tool === 'brush' && selectedColor === color) ? '2px solid white' : '1px solid #555',
-                  cursor: 'pointer',
-                  borderRadius: '4px'
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div style={{ height: '1px', background: '#555', margin: '5px 0' }}></div>
-
-        {/* Tools */}
-        <div>
-          <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Tools</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+      {(showTools || !isMobile) && (
+        <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(30,30,30,0.9)', padding: '15px', borderRadius: '8px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {isMobile && (
             <button
-              onClick={() => setTool('eraser')}
-              style={{
-                padding: '8px',
-                background: tool === 'eraser' ? '#4a90e2' : '#333',
-                border: '1px solid #555',
-                borderRadius: '4px',
-                color: 'white',
-                cursor: 'pointer',
-                flex: 1
-              }}
+              onClick={() => setShowTools(false)}
+              style={{ alignSelf: 'flex-end', background: 'none', border: 'none', color: '#aaa', fontSize: '20px', cursor: 'pointer', padding: 0, margin: '-5px 0 0 0' }}
             >
-              Eraser
+              ×
             </button>
-            <button
-              onClick={handleClear}
-              style={{
-                padding: '8px',
-                background: '#d9534f',
-                border: '1px solid #d43f3a',
-                borderRadius: '4px',
-                color: 'white',
-                cursor: 'pointer',
-                flex: 1
-              }}
-            >
-              Clear
-            </button>
-          </div>
-        </div>
+          )}
 
-        {/* Line Width Slider */}
-        <div>
-          <h3 style={{ margin: '10px 0 5px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Size: {lineWidth}px</h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <input
-              type="range"
-              min="1"
-              max="20"
-              value={lineWidth}
-              onChange={(e) => setLineWidth(Number(e.target.value))}
-              style={{ width: '100px' }}
-            />
-            {/* Size Indicator */}
-            <div style={{
-              width: '20px',
-              height: '20px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <div style={{
-                width: lineWidth + 'px',
-                height: lineWidth + 'px',
-                background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'),
-                borderRadius: '50%',
-                border: tool === 'eraser' ? '1px solid #999' : 'none'
-              }} />
+          {/* Color Grid */}
+          <div>
+            <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Paint Color</h3>
+            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '150px' }}>
+              {[0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0x000000].map(color => (
+                <div
+                  key={color}
+                  onClick={() => {
+                    setTool('brush');
+                    setSelectedColor(color);
+                  }}
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    backgroundColor: '#' + color.toString(16).padStart(6, '0'),
+                    border: (tool === 'brush' && selectedColor === color) ? '2px solid white' : '1px solid #555',
+                    cursor: 'pointer',
+                    borderRadius: '4px'
+                  }}
+                />
+              ))}
             </div>
           </div>
-        </div>
 
-      </div>
+          {/* Divider */}
+          <div style={{ height: '1px', background: '#555', margin: '5px 0' }}></div>
+
+          {/* Tools */}
+          <div>
+            <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Tools</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <button
+                onClick={() => setTool('eraser')}
+                style={{
+                  padding: '8px',
+                  background: tool === 'eraser' ? '#4a90e2' : '#333',
+                  border: '1px solid #555',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  flex: 1
+                }}
+              >
+                Eraser
+              </button>
+              <button
+                onClick={handleClear}
+                style={{
+                  padding: '8px',
+                  background: '#d9534f',
+                  border: '1px solid #d43f3a',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  flex: 1
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Line Width Slider */}
+          <div>
+            <h3 style={{ margin: '10px 0 5px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Size: {lineWidth}px</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={lineWidth}
+                onChange={(e) => setLineWidth(Number(e.target.value))}
+                style={{ width: '100px' }}
+              />
+              {/* Size Indicator */}
+              <div style={{
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <div style={{
+                  width: lineWidth + 'px',
+                  height: lineWidth + 'px',
+                  background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'),
+                  borderRadius: '50%',
+                  border: tool === 'eraser' ? '1px solid #999' : 'none'
+                }} />
+              </div>
+            </div>
+          </div>
+
+        </div>
+      )}
 
       <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>
       <div style={{ color: '#aaa', marginBottom: '1rem' }}>
@@ -360,6 +435,7 @@ function App() {
         onStrokeStart={startStroke}
         onStrokeMove={moveStroke}
         onStrokeEnd={endStroke}
+        scale={scale}
       />
     </div>
   );
