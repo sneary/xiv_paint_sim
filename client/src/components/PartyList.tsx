@@ -46,19 +46,14 @@ const PartyList: React.FC<PartyListProps> = ({ players, myId }) => {
 
     return (
         <div style={{
-            position: 'absolute',
-            // Positioned below standard top-left/right elements, 
-            // or we can put it Top-Left but offset by some amount if needed.
-            // Let's try Top-Left slightly offset to not cover config instructions if they exist,
-            // But standard HUD is top-left. Let's put it below the Config button area.
-            top: 150,
-            left: 20,
+            // position: 'absolute', // Removed to allow parent control
+            // top: 150, left: 20,
             width: '200px',
             background: 'rgba(0, 0, 0, 0.5)',
             borderRadius: '5px',
             padding: '5px',
-            pointerEvents: 'none', // Allow clicking through to arena if needed (though usually HUD blocks)
-            zIndex: 90, // Below overlays like config menu
+            pointerEvents: 'none',
+            zIndex: 90,
             color: 'white',
             fontFamily: "'Outfit', sans-serif",
             display: 'flex',

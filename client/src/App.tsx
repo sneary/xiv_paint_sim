@@ -373,7 +373,17 @@ function App() {
       </div>
 
       {/* Party List and Debuff Button Container */}
-      <div style={{ position: 'absolute', top: 170, left: 20, display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'flex-start' }}>
+      <div style={{
+        position: 'absolute',
+        top: isMobile ? 50 : 170, // Mobile: Top center (below buttons). Desktop: Left column.
+        left: isMobile ? '50%' : 20,
+        transform: isMobile ? 'translateX(-50%)' : 'none',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        alignItems: isMobile ? 'center' : 'flex-start',
+        zIndex: 150 // Ensure above arena
+      }}>
         <PartyList players={gameState.players} myId={myId} />
 
         <button
