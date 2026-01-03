@@ -851,9 +851,6 @@ function App() {
             onBlur={() => setTextInput(null)}
           />
         )}
-        <div style={{ position: 'fixed', bottom: 5, right: 5, color: '#444', fontSize: '10px', pointerEvents: 'none' }}>
-          v{new Date().toISOString().split('T')[1].split('.')[0]} (Alt-Safety Only)
-        </div>
       </div>
     </div>
   );
