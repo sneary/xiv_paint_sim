@@ -32,6 +32,7 @@ function App() {
   // Movement state
   const keysPressed = useRef<Record<string, boolean>>({});
 
+
   // Joystick state
   const joystickRef = useRef<{ x: number, y: number } | null>(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -138,6 +139,7 @@ function App() {
     };
   }, []);
 
+
   // Input handling setup
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -155,14 +157,22 @@ function App() {
       keysPressed.current = {};
     };
 
+    // Standard listener
+    window.addEventListener('blur', handleBlur);
+    // Chrome workaround: Also listen on document with capture phase
+    document.addEventListener('blur', handleBlur, true);
+    // Chrome workaround: Direct property assignment as fallback
+    window.onblur = handleBlur;
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    window.addEventListener('blur', handleBlur);
 
     return () => {
+      window.removeEventListener('blur', handleBlur);
+      document.removeEventListener('blur', handleBlur, true);
+      window.onblur = null;
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-      window.removeEventListener('blur', handleBlur);
     };
   }, []);
 
@@ -248,7 +258,6 @@ function App() {
 
         // 2. Send to Server (Throttle this? For now, per frame movement emit might be high load but smoothest)
         // Optimization: Could throttle network sends to 20-30hz while simulating locally at high FPS.
-        // For simple MVP, sending every frame is OK for local/LAN, but we should consider throttling.
         socket.emit('move', { x: newX, y: newY });
       }
     };
@@ -271,6 +280,7 @@ function App() {
   const [activeMarker, setActiveMarker] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [linePreview, setLinePreview] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null);
+  const [textInput, setTextInput] = useState<{ x: number, y: number, value: string } | null>(null);
   const currentStrokeIdRef = useRef<string | null>(null);
 
   const startStroke = (x: number, y: number) => {
@@ -281,17 +291,8 @@ function App() {
     }
 
     if (tool === 'text') {
-      const text = prompt('Enter text:');
-      if (text) {
-        socketRef.current?.emit('addText', {
-          id: Math.random().toString(36).substr(2, 9),
-          x,
-          y,
-          text,
-          color: selectedColor,
-          fontSize: Math.max(12, lineWidth * 2) // Scale font with line width
-        });
-      }
+      setTextInput({ x, y, value: '' });
+      setIsDrawing(false);
       return;
     }
 
@@ -482,311 +483,372 @@ function App() {
       </div>
 
       {/* Countdown Overlay */}
-      {countdown && (
-        <div style={{
-          position: 'absolute',
-          top: '30%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)',
-          fontSize: '8rem',
-          fontWeight: 'bold',
-          color: '#FFD700', // Gold
-          textShadow: '0 0 20px #000, 2px 2px 0px #000',
-          fontFamily: "'Outfit', sans-serif",
-          pointerEvents: 'none',
-          zIndex: 1000
-        }}>
-          {countdown}
-        </div>
-      )}
+      {
+        countdown && (
+          <div style={{
+            position: 'absolute',
+            top: '30%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: '8rem',
+            fontWeight: 'bold',
+            color: '#FFD700', // Gold
+            textShadow: '0 0 20px #000, 2px 2px 0px #000',
+            fontFamily: "'Outfit', sans-serif",
+            pointerEvents: 'none',
+            zIndex: 1000
+          }}>
+            {countdown}
+          </div>
+        )
+      }
 
       {/* Config Menu Toggle (Mobile) */}
-      {isMobile && !showConfig && (
-        <button
-          onClick={() => setShowConfig(true)}
-          style={{
-            position: 'absolute', top: 20, left: 20, zIndex: 110,
-            background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
-          }}
-        >
-          ⚙️
-        </button>
-      )}
+      {
+        isMobile && !showConfig && (
+          <button
+            onClick={() => setShowConfig(true)}
+            style={{
+              position: 'absolute', top: 20, left: 20, zIndex: 110,
+              background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
+            }}
+          >
+            ⚙️
+          </button>
+        )
+      }
 
       {/* Config Menu */}
-      {(showConfig || !isMobile) && (
-        <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 120 }}>
-          <div style={{ position: 'relative' }}>
-            <ConfigMenu
-              config={gameState.config}
-              onUpdate={handleConfigUpdate}
-              onSetDebuffs={() => setShowDebuffMenu(true)}
-              onClearDebuffs={() => {
-                if (socketRef.current) {
-                  const updates: Record<string, number[]> = {};
-                  Object.keys(gameState.players).forEach(id => {
-                    updates[id] = [];
-                  });
-                  socketRef.current.emit('updateDebuffs', updates);
-                }
-              }}
+      {
+        (showConfig || !isMobile) && (
+          <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 120 }}>
+            <div style={{ position: 'relative' }}>
+              <ConfigMenu
+                config={gameState.config}
+                onUpdate={handleConfigUpdate}
+                onSetDebuffs={() => setShowDebuffMenu(true)}
+                onClearDebuffs={() => {
+                  if (socketRef.current) {
+                    const updates: Record<string, number[]> = {};
+                    Object.keys(gameState.players).forEach(id => {
+                      updates[id] = [];
+                    });
+                    socketRef.current.emit('updateDebuffs', updates);
+                  }
+                }}
+              />
+              {isMobile && (
+                <button
+                  onClick={() => setShowConfig(false)}
+                  style={{ position: 'absolute', top: -10, right: -10, background: 'red', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer' }}
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* Mobile Joystick - Bottom Left */}
+      {
+        isMobile && (
+          <div style={{ position: 'absolute', bottom: 80, left: 80, zIndex: 200 }}>
+            <Joystick
+              size={100}
+              sticky={false}
+              baseColor="#333"
+              stickColor="#555"
+              move={handleJoystickMove}
+              stop={handleJoystickStop}
             />
+          </div>
+        )
+      }
+
+      {/* Tools Toggle (Mobile) */}
+      {
+        isMobile && !showTools && (
+          <button
+            onClick={() => setShowTools(true)}
+            style={{
+              position: 'absolute', top: 20, right: 20, zIndex: 110,
+              background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
+            }}
+          >
+            🎨
+          </button>
+        )
+      }
+
+      {/* Color Picker UI */}
+      {
+        (showTools || !isMobile) && (
+          <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(30,30,30,0.9)', padding: '15px', borderRadius: '8px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {isMobile && (
               <button
-                onClick={() => setShowConfig(false)}
-                style={{ position: 'absolute', top: -10, right: -10, background: 'red', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer' }}
+                onClick={() => setShowTools(false)}
+                style={{ alignSelf: 'flex-end', background: 'none', border: 'none', color: '#aaa', fontSize: '20px', cursor: 'pointer', padding: 0, margin: '-5px 0 0 0' }}
               >
                 ×
               </button>
             )}
-          </div>
-        </div>
-      )}
 
-      {/* Mobile Joystick - Bottom Left */}
-      {isMobile && (
-        <div style={{ position: 'absolute', bottom: 80, left: 80, zIndex: 200 }}>
-          <Joystick
-            size={100}
-            sticky={false}
-            baseColor="#333"
-            stickColor="#555"
-            move={handleJoystickMove}
-            stop={handleJoystickStop}
-          />
-        </div>
-      )}
+            {/* Color Grid */}
+            <div>
+              <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Paint Color</h3>
+              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '150px' }}>
+                {[0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0xCC5500].map(color => (
+                  <div
+                    key={color}
+                    onClick={() => {
+                      setTool('brush');
+                      setSelectedColor(color);
+                    }}
+                    style={{
+                      width: '30px',
+                      height: '30px',
+                      backgroundColor: '#' + color.toString(16).padStart(6, '0'),
+                      border: (tool === 'brush' && selectedColor === color) ? '2px solid white' : '1px solid #555',
+                      cursor: 'pointer',
+                      borderRadius: '4px'
+                    }}
+                  />
+                ))}
 
-      {/* Tools Toggle (Mobile) */}
-      {isMobile && !showTools && (
-        <button
-          onClick={() => setShowTools(true)}
-          style={{
-            position: 'absolute', top: 20, right: 20, zIndex: 110,
-            background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
-          }}
-        >
-          🎨
-        </button>
-      )}
-
-      {/* Color Picker UI */}
-      {(showTools || !isMobile) && (
-        <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(30,30,30,0.9)', padding: '15px', borderRadius: '8px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {isMobile && (
-            <button
-              onClick={() => setShowTools(false)}
-              style={{ alignSelf: 'flex-end', background: 'none', border: 'none', color: '#aaa', fontSize: '20px', cursor: 'pointer', padding: 0, margin: '-5px 0 0 0' }}
-            >
-              ×
-            </button>
-          )}
-
-          {/* Color Grid */}
-          <div>
-            <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Paint Color</h3>
-            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '150px' }}>
-              {[0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0xCC5500].map(color => (
-                <div
-                  key={color}
-                  onClick={() => {
-                    setTool('brush');
-                    setSelectedColor(color);
-                  }}
-                  style={{
-                    width: '30px',
-                    height: '30px',
-                    backgroundColor: '#' + color.toString(16).padStart(6, '0'),
-                    border: (tool === 'brush' && selectedColor === color) ? '2px solid white' : '1px solid #555',
-                    cursor: 'pointer',
-                    borderRadius: '4px'
-                  }}
-                />
-              ))}
-
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div style={{ height: '1px', background: '#555', margin: '5px 0' }}></div>
-
-          {/* Tools */}
-          <div>
-            <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Tools</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button
-                onClick={() => setTool('eraser')}
-                style={{
-                  padding: '8px',
-                  background: tool === 'eraser' ? '#4a90e2' : '#333',
-                  border: '1px solid #555',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  flex: 1
-                }}
-              >
-                Eraser
-              </button>
-              <button
-                onClick={() => setTool('line')}
-                style={{
-                  padding: '8px',
-                  background: tool === 'line' ? '#4a90e2' : '#333',
-                  border: '1px solid #555',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  flex: 1
-                }}
-              >
-                Line
-              </button>
-              <button
-                onClick={() => setTool('text')}
-                style={{
-                  padding: '8px',
-                  background: tool === 'text' ? '#4a90e2' : '#333',
-                  border: '1px solid #555',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  flex: 1
-                }}
-              >
-                Text
-              </button>
-
-              <button
-                onClick={() => socketRef.current?.emit('undoStroke')}
-                style={{
-                  padding: '8px',
-                  background: '#ff9800',
-                  border: '1px solid #e68900',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  flex: 1
-                }}
-              >
-                Undo
-              </button>
-              <button
-                onClick={handleClear}
-                style={{
-                  padding: '8px',
-                  background: '#d9534f',
-                  border: '1px solid #d43f3a',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  flex: 1
-                }}
-              >
-                Clear
-              </button>
-            </div>
-
-            {/* Save/Load */}
-            <div style={{ display: 'flex', gap: '5px' }}>
-              <button
-                onClick={handleSave}
-                style={{
-                  padding: '8px',
-                  background: '#4CAF50',
-                  border: '1px solid #388E3C',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer'
-                }}
-              >
-                Save
-              </button>
-              <label style={{
-                padding: '8px',
-                background: '#2196F3',
-                border: '1px solid #1976D2',
-                borderRadius: '4px',
-                color: 'white',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: 0
-              }}>
-                Load
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleLoad}
-                  style={{ display: 'none' }}
-                />
-              </label>
-            </div>
-          </div>
-
-          {/* Line Width Slider */}
-          <div>
-            <h3 style={{ margin: '10px 0 5px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Size: {lineWidth}px</h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={lineWidth}
-                onChange={(e) => setLineWidth(Number(e.target.value))}
-                style={{ width: '100px' }}
-              />
-              {/* Size Indicator */}
-              <div style={{
-                width: '20px',
-                height: '20px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}>
-                <div style={{
-                  width: lineWidth + 'px',
-                  height: lineWidth + 'px',
-                  background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'),
-                  borderRadius: '50%',
-                  border: tool === 'eraser' ? '1px solid #999' : 'none'
-                }} />
               </div>
             </div>
+
+            {/* Divider */}
+            <div style={{ height: '1px', background: '#555', margin: '5px 0' }}></div>
+
+            {/* Tools */}
+            <div>
+              <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Tools</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <button
+                  onClick={() => setTool('eraser')}
+                  style={{
+                    padding: '8px',
+                    background: tool === 'eraser' ? '#4a90e2' : '#333',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    flex: 1
+                  }}
+                >
+                  Eraser
+                </button>
+                <button
+                  onClick={() => setTool('line')}
+                  style={{
+                    padding: '8px',
+                    background: tool === 'line' ? '#4a90e2' : '#333',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    flex: 1
+                  }}
+                >
+                  Line
+                </button>
+                <button
+                  onClick={() => setTool('text')}
+                  style={{
+                    padding: '8px',
+                    background: tool === 'text' ? '#4a90e2' : '#333',
+                    border: '1px solid #555',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    flex: 1
+                  }}
+                >
+                  Text
+                </button>
+
+                <button
+                  onClick={() => socketRef.current?.emit('undoStroke')}
+                  style={{
+                    padding: '8px',
+                    background: '#ff9800',
+                    border: '1px solid #e68900',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    flex: 1
+                  }}
+                >
+                  Undo
+                </button>
+                <button
+                  onClick={handleClear}
+                  style={{
+                    padding: '8px',
+                    background: '#d9534f',
+                    border: '1px solid #d43f3a',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer',
+                    flex: 1
+                  }}
+                >
+                  Clear
+                </button>
+              </div>
+
+              {/* Save/Load */}
+              <div style={{ display: 'flex', gap: '5px' }}>
+                <button
+                  onClick={handleSave}
+                  style={{
+                    padding: '8px',
+                    background: '#4CAF50',
+                    border: '1px solid #388E3C',
+                    borderRadius: '4px',
+                    color: 'white',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Save
+                </button>
+                <label style={{
+                  padding: '8px',
+                  background: '#2196F3',
+                  border: '1px solid #1976D2',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: 0
+                }}>
+                  Load
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleLoad}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Line Width Slider */}
+            <div>
+              <h3 style={{ margin: '10px 0 5px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Size: {lineWidth}px</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  type="range"
+                  min="1"
+                  max="40"
+                  value={lineWidth}
+                  onChange={(e) => setLineWidth(Number(e.target.value))}
+                  style={{ width: '100px' }}
+                />
+                {/* Size Indicator */}
+                <div style={{
+                  width: '45px',
+                  height: '45px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
+                  <div style={{
+                    width: lineWidth + 'px',
+                    height: lineWidth + 'px',
+                    background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'),
+                    borderRadius: '50%',
+                    border: tool === 'eraser' ? '1px solid #999' : 'none'
+                  }} />
+                </div>
+              </div>
+            </div>
+
+            {!isMobile && (
+              <WaymarkMenu
+                activeMarker={activeMarker}
+                onSelect={(m) => {
+                  setActiveMarker(m);
+                  if (m) setTool('brush'); // Ensure brush isn't eraser? Or purely visual.
+                }}
+                onClearAll={() => socketRef.current?.emit('clearMarkers')}
+              />
+            )}
+
+
           </div>
-
-          {!isMobile && (
-            <WaymarkMenu
-              activeMarker={activeMarker}
-              onSelect={(m) => {
-                setActiveMarker(m);
-                if (m) setTool('brush'); // Ensure brush isn't eraser? Or purely visual.
-              }}
-              onClearAll={() => socketRef.current?.emit('clearMarkers')}
-            />
-          )}
+        )
+      }
 
 
+
+      <div style={{ position: 'relative', width: 800 * scale, height: 600 * scale }}>
+        <Arena
+          players={gameState.players}
+          myId={myId}
+          config={gameState.config}
+          strokes={gameState.strokes}
+          onStrokeStart={startStroke}
+          onStrokeMove={moveStroke}
+          onStrokeEnd={endStroke}
+          scale={scale}
+          honkingPlayers={honkingPlayers}
+          markers={gameState.markers}
+          linePreview={linePreview}
+          text={gameState.text}
+          currentTool={tool}
+          currentColor={selectedColor}
+          currentWidth={lineWidth}
+        />
+        {textInput && (
+          <input
+            autoFocus
+            style={{
+              position: 'absolute',
+              left: textInput.x * scale,
+              top: textInput.y * scale,
+              transform: 'translate(-50%, -50%)',
+              zIndex: 1000,
+              background: 'rgba(0,0,0,0.5)',
+              color: '#' + selectedColor.toString(16).padStart(6, '0'),
+              border: '1px solid white',
+              padding: '5px',
+              borderRadius: '4px',
+              fontSize: Math.max(12, lineWidth * 2) + 'px',
+              fontFamily: 'Arial',
+              textShadow: '0 0 2px black'
+            }}
+            value={textInput.value}
+            onChange={e => setTextInput({ ...textInput, value: e.target.value })}
+            onKeyDown={e => {
+              e.stopPropagation(); // Stop bubbling to game keys
+              if (e.key === 'Enter') {
+                if (textInput.value.trim()) {
+                  socketRef.current?.emit('addText', {
+                    id: Math.random().toString(36).substr(2, 9),
+                    x: textInput.x,
+                    y: textInput.y,
+                    text: textInput.value,
+                    color: selectedColor,
+                    fontSize: Math.max(12, lineWidth * 2)
+                  });
+                }
+                setTextInput(null);
+              } else if (e.key === 'Escape') {
+                setTextInput(null);
+              }
+            }}
+            onBlur={() => setTextInput(null)}
+          />
+        )}
+        <div style={{ position: 'fixed', bottom: 5, right: 5, color: '#444', fontSize: '10px', pointerEvents: 'none' }}>
+          v{new Date().toISOString().split('T')[1].split('.')[0]} (Alt-Safety Only)
         </div>
-      )}
-
-
-
-      <Arena
-        players={gameState.players}
-        myId={myId}
-        config={gameState.config}
-        strokes={gameState.strokes}
-        onStrokeStart={startStroke}
-        onStrokeMove={moveStroke}
-        onStrokeEnd={endStroke}
-        scale={scale}
-        honkingPlayers={honkingPlayers}
-        markers={gameState.markers}
-        linePreview={linePreview}
-        text={gameState.text}
-      />
+      </div>
     </div>
   );
 }

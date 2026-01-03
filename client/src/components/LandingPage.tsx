@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './LandingPage.css';
 
 interface LandingPageProps {
@@ -13,6 +13,7 @@ const COLORS = [
 ];
 
 const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
+
     const [name, setName] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLORS[0]);
     const [selectedRole, setSelectedRole] = useState<'tank' | 'healer' | 'dps' | 'spectator'>('dps');
@@ -21,6 +22,16 @@ const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
     const isNameTaken = (n: string) => takenNames.some(taken => taken.toLowerCase() === n.toLowerCase());
     const isColorTaken = (c: number) => takenColors.includes(c);
     const isSpectator = selectedRole === 'spectator';
+
+    // Auto-select next available color if current is taken
+    useEffect(() => {
+        if (!isSpectator && isColorTaken(selectedColor)) {
+            const nextColor = COLORS.find(c => !takenColors.includes(c));
+            if (nextColor !== undefined) {
+                setSelectedColor(nextColor);
+            }
+        }
+    }, [takenColors, selectedColor, isSpectator]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -109,8 +120,6 @@ const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
                                                 style={{
                                                     backgroundColor: '#' + color.toString(16).padStart(6, '0'),
                                                     color: '#' + color.toString(16).padStart(6, '0'),
-                                                    opacity: taken ? 0.2 : 1,
-                                                    cursor: taken ? 'not-allowed' : 'pointer'
                                                 }}
                                             />
                                         );

@@ -26,6 +26,7 @@ const gameState: GameState = { ...initialState };
 
 io.on('connection', (socket) => {
     console.log('User connected:', socket.id);
+    socket.emit('stateUpdate', gameState);
 
     // gameState.players[socket.id] = { ... } -- Removed auto-spawn
 

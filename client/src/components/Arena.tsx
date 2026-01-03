@@ -1,5 +1,5 @@
 import { Stage, Graphics, Container, Text, Sprite } from '@pixi/react'; import * as PIXI from 'pixi.js';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { Player, ArenaConfig, Stroke } from '../types';
 
 interface ArenaProps {
@@ -16,9 +16,42 @@ interface ArenaProps {
     // Preview for current line tool
     linePreview?: { x1: number, y1: number, x2: number, y2: number } | null;
     text?: { id: string, x: number, y: number, text: string, color: number, fontSize: number }[];
+    currentTool?: 'brush' | 'eraser' | 'line' | 'text';
+    currentColor?: number;
+    currentWidth?: number;
 }
 
-const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1, honkingPlayers = {}, markers = {}, linePreview, text = [] }: ArenaProps) => {
+const Arena = ({
+    players,
+    myId,
+    config,
+    strokes,
+    onStrokeStart,
+    onStrokeMove,
+    onStrokeEnd,
+    scale = 1,
+    honkingPlayers = {},
+    markers = {},
+    linePreview,
+    text = [],
+    currentTool = 'brush',
+    currentColor = 0xff0000,
+    currentWidth = 3
+}: ArenaProps) => {
+    // Optimization: Use ref for cursor to avoid re-rendering entire Arena on mousemove
+    // We strictly use the ref for POSITION updates. 
+    // Appearance (draw) is handled by the Graphics component's draw prop, which re-runs when props change.
+    const cursorRef = useRef<PIXI.Graphics>(null);
+
+    console.log('Arena render. Text items:', text);
+
+    // Helper to move cursor imperatively
+    const updateCursorPos = (x: number, y: number) => {
+        if (cursorRef.current) {
+            cursorRef.current.position.set(x, y);
+            cursorRef.current.visible = currentTool !== 'text';
+        }
+    };
     return (
         <Stage
             width={800 * scale}
@@ -44,6 +77,14 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                     onpointermove={(e) => {
                         const local = e.getLocalPosition(e.currentTarget as PIXI.DisplayObject);
                         onStrokeMove(local.x, local.y);
+                        updateCursorPos(local.x, local.y);
+                    }}
+                    onpointerover={(e) => {
+                        const local = e.getLocalPosition(e.currentTarget as PIXI.DisplayObject);
+                        updateCursorPos(local.x, local.y);
+                    }}
+                    onpointerout={() => {
+                        if (cursorRef.current) cursorRef.current.visible = false;
                     }}
                     onpointerup={() => onStrokeEnd()}
                     onpointerupoutside={() => onStrokeEnd()}
@@ -55,16 +96,31 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                         try {
                             g.clear();
                             // Existing Strokes
+                            // Existing Strokes
                             strokes.forEach((stroke) => {
-                                if (!stroke || !stroke.points || stroke.points.length < 2) return;
+                                if (!stroke || !stroke.points || stroke.points.length === 0) return;
                                 const color = typeof stroke.color === 'number' ? stroke.color : parseInt(stroke.color as any, 16) || 0xffffff;
                                 const width = stroke.width || 3;
                                 const finalColor = stroke.isEraser ? 0x101010 : color;
 
-                                g.lineStyle(width, finalColor, 1);
-                                g.moveTo(stroke.points[0].x, stroke.points[0].y);
-                                for (let i = 1; i < stroke.points.length; i++) {
-                                    g.lineTo(stroke.points[i].x, stroke.points[i].y);
+                                g.lineStyle({
+                                    width,
+                                    color: finalColor,
+                                    alpha: 1,
+                                    cap: PIXI.LINE_CAP.ROUND,
+                                    join: PIXI.LINE_JOIN.ROUND
+                                });
+
+                                if (stroke.points.length === 1) {
+                                    g.lineStyle(0); // Clear stroke to avoid adding width to the circle
+                                    g.beginFill(finalColor);
+                                    g.drawCircle(stroke.points[0].x, stroke.points[0].y, width / 2);
+                                    g.endFill();
+                                } else {
+                                    g.moveTo(stroke.points[0].x, stroke.points[0].y);
+                                    for (let i = 1; i < stroke.points.length; i++) {
+                                        g.lineTo(stroke.points[i].x, stroke.points[i].y);
+                                    }
                                 }
                             });
 
@@ -80,6 +136,8 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                         }
                     }, [strokes, linePreview])}
                 />
+
+
 
                 {/* Text Layer */}
                 <Container>
@@ -178,6 +236,41 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                         );
                     })}
                 </Container>
+
+                {/* Cursor Preview Layer */}
+                <Graphics
+                    ref={cursorRef}
+                    draw={useCallback((g: PIXI.Graphics) => {
+                        g.clear();
+                        if (currentTool === 'text') {
+                            const color = currentColor || 0xff0000;
+                            g.lineStyle(2, color, 1);
+                            // Draw I-beam
+                            g.moveTo(0, -10);
+                            g.lineTo(0, 10);
+                            // Serifs
+                            g.moveTo(-5, -10);
+                            g.lineTo(5, -10);
+                            g.moveTo(-5, 10);
+                            g.lineTo(5, 10);
+
+                            g.visible = true;
+                            return;
+                        }
+                        const isEraser = currentTool === 'eraser';
+                        const color = isEraser ? 0xffffff : (currentColor || 0xff0000);
+                        const alpha = isEraser ? 0.5 : 0.8;
+
+                        let r = Math.max((currentWidth || 3) / 2, 2);
+                        if (isNaN(r)) r = 2;
+
+                        g.lineStyle(2, 0x000000, 0.5);
+                        g.beginFill(color, alpha);
+                        g.drawCircle(0, 0, r);
+                        g.endFill();
+                    }, [currentTool, currentColor, currentWidth])}
+
+                />
 
                 {/* Players */}
                 {Object.values(players).map((player) => {
