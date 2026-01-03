@@ -143,6 +143,12 @@ function App() {
   // Input handling setup
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Safety: If Alt or Meta (Windows) key is pressed, stop movement immediately
+      if (e.key === 'Alt' || e.key === 'Meta' || e.key === 'Tab') {
+        keysPressed.current = {};
+        return;
+      }
+
       keysPressed.current[e.key.toLowerCase()] = true;
       if (e.key === ' ' && !e.repeat) {
         socketRef.current?.emit('honk');
