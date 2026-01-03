@@ -157,6 +157,7 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                                 width={size}
                                 height={size}
                                 anchor={0.5}
+                                alpha={0.75}
                             />
                         );
                     })}
