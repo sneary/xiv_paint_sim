@@ -549,6 +549,7 @@ function App() {
                   }}
                 />
               ))}
+
             </div>
           </div>
 
@@ -587,6 +588,7 @@ function App() {
               >
                 Line
               </button>
+
               <button
                 onClick={() => socketRef.current?.emit('undoStroke')}
                 style={{
