@@ -416,16 +416,6 @@ function App() {
   const [showDebuffMenu, setShowDebuffMenu] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
 
-  const handleApplyDebuffs = (updates: Record<string, number[]>, useCountdown: boolean) => {
-    if (socketRef.current) {
-      if (useCountdown) {
-        socketRef.current.emit('startDebuffCountdown', updates);
-      } else {
-        socketRef.current.emit('updateDebuffs', updates);
-      }
-    }
-  };
-
   useEffect(() => {
     if (!socketRef.current) return;
 
@@ -458,7 +448,19 @@ function App() {
       {showDebuffMenu && (
         <DebuffMenu
           players={gameState.players}
-          onApply={handleApplyDebuffs}
+          onApply={(debuffUpdates, limitCutUpdates, useCountdown) => {
+            if (socketRef.current) {
+              if (useCountdown) {
+                socketRef.current.emit('startDebuffCountdown', {
+                  debuffs: debuffUpdates,
+                  limitCuts: limitCutUpdates
+                });
+              } else {
+                socketRef.current.emit('updateDebuffs', debuffUpdates);
+                socketRef.current.emit('updateLimitCuts', limitCutUpdates);
+              }
+            }
+          }}
           onClose={() => setShowDebuffMenu(false)}
         />
       )}
@@ -540,6 +542,16 @@ function App() {
                       updates[id] = [];
                     });
                     socketRef.current.emit('updateDebuffs', updates);
+                  }
+                }}
+                onLimitCut={() => {
+                  if (socketRef.current) {
+                    socketRef.current.emit('limitCut');
+                  }
+                }}
+                onClearLimitCut={() => {
+                  if (socketRef.current) {
+                    socketRef.current.emit('clearLimitCut');
                   }
                 }}
               />

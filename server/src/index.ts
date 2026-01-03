@@ -230,7 +230,7 @@ io.on('connection', (socket) => {
         io.emit('honk', socket.id);
     });
 
-    socket.on('startDebuffCountdown', (updates: Record<string, number[]>) => {
+    socket.on('startDebuffCountdown', (data: { debuffs: Record<string, number[]>, limitCuts?: Record<string, number | undefined> }) => {
         // 3
         io.emit('countdown', '3');
         setTimeout(() => {
@@ -241,11 +241,21 @@ io.on('connection', (socket) => {
                 io.emit('countdown', '1');
                 setTimeout(() => {
                     // START - Apply Changes
-                    Object.entries(updates).forEach(([playerId, debuffs]) => {
-                        if (gameState.players[playerId]) {
-                            gameState.players[playerId].debuffs = debuffs;
-                        }
-                    });
+                    if (data.debuffs) {
+                        Object.entries(data.debuffs).forEach(([playerId, debuffs]) => {
+                            if (gameState.players[playerId]) {
+                                gameState.players[playerId].debuffs = debuffs;
+                            }
+                        });
+                    }
+                    if (data.limitCuts) {
+                        Object.entries(data.limitCuts).forEach(([playerId, lc]) => {
+                            if (gameState.players[playerId]) {
+                                if (lc) gameState.players[playerId].limitCut = lc;
+                                else delete gameState.players[playerId].limitCut;
+                            }
+                        });
+                    }
 
                     io.emit('stateUpdate', gameState);
                     io.emit('countdown', 'START');
@@ -264,6 +274,64 @@ io.on('connection', (socket) => {
             if (gameState.players[playerId]) {
                 gameState.players[playerId].debuffs = debuffs;
             }
+        });
+        io.emit('stateUpdate', gameState);
+    });
+
+    socket.on('updateLimitCuts', (updates: Record<string, number | undefined>) => {
+        Object.entries(updates).forEach(([playerId, lc]) => {
+            if (gameState.players[playerId]) {
+                if (lc) gameState.players[playerId].limitCut = lc;
+                else delete gameState.players[playerId].limitCut;
+            }
+        });
+        io.emit('stateUpdate', gameState);
+    });
+
+    // Limit Cut: Randomly assign 1-8 to non-spectator players with countdown
+    socket.on('limitCut', () => {
+        // 3
+        io.emit('countdown', '3');
+        setTimeout(() => {
+            // 2
+            io.emit('countdown', '2');
+            setTimeout(() => {
+                // 1
+                io.emit('countdown', '1');
+                setTimeout(() => {
+                    // START - Apply Limit Cut
+                    const nonSpectators = Object.values(gameState.players)
+                        .filter(p => p.role !== 'spectator');
+
+                    // Shuffle numbers 1-8
+                    const numbers = [1, 2, 3, 4, 5, 6, 7, 8];
+                    for (let i = numbers.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+                    }
+
+                    // Assign to players (up to 8)
+                    nonSpectators.forEach((player, index) => {
+                        if (index < 8) {
+                            gameState.players[player.id].limitCut = numbers[index];
+                        }
+                    });
+
+                    io.emit('stateUpdate', gameState);
+                    io.emit('countdown', 'START');
+
+                    // Clear countdown text after 1s
+                    setTimeout(() => {
+                        io.emit('countdown', null);
+                    }, 1000);
+                }, 1000);
+            }, 1000);
+        }, 1000);
+    });
+
+    socket.on('clearLimitCut', () => {
+        Object.values(gameState.players).forEach(player => {
+            delete player.limitCut;
         });
         io.emit('stateUpdate', gameState);
     });

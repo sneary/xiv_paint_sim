@@ -342,6 +342,102 @@ const Arena = ({
                                 </Container>
                             )}
 
+                            {/* Limit Cut - Render dots pattern above debuffs */}
+                            {player.limitCut && (
+                                <Container x={0} y={isSpectator ? -35 : -60}>
+                                    <Graphics
+                                        draw={(g) => {
+                                            try {
+                                                g.clear();
+                                                const num = player.limitCut!;
+                                                const color = num % 2 === 1 ? 0x00B4FF : 0xFF6B4A; // Blue = odd, Red = even
+                                                const dotRadius = 3;
+                                                const sp = 8; // spacing
+
+                                                // Draw dot helper
+                                                const drawDot = (x: number, y: number) => {
+                                                    g.beginFill(color);
+                                                    g.lineStyle(1, 0x000000);
+                                                    g.drawCircle(x, y, dotRadius);
+                                                    g.endFill();
+                                                };
+
+                                                // FFXIV Limit Cut patterns (matching screenshot)
+                                                switch (num) {
+                                                    case 1:
+                                                        drawDot(0, 0);
+                                                        break;
+                                                    case 2:
+                                                        drawDot(-sp / 2, 0);
+                                                        drawDot(sp / 2, 0);
+                                                        break;
+                                                    case 3:
+                                                        // 1 on top, 2 below (triangle)
+                                                        drawDot(0, -sp / 2); // top
+                                                        drawDot(-sp / 2, sp / 2); // bottom left
+                                                        drawDot(sp / 2, sp / 2); // bottom right
+                                                        break;
+                                                    case 4:
+                                                        drawDot(-sp / 2, -sp / 2);
+                                                        drawDot(sp / 2, -sp / 2);
+                                                        drawDot(-sp / 2, sp / 2);
+                                                        drawDot(sp / 2, sp / 2);
+                                                        break;
+                                                    case 5:
+                                                        // 1 dot left, 4 dots (2x2) right
+                                                        drawDot(-sp * 1.5, 0); // single dot left
+
+                                                        // 2x2 square to the right
+                                                        drawDot(0, -sp / 2); // top left of square
+                                                        drawDot(sp, -sp / 2); // top right of square
+                                                        drawDot(0, sp / 2); // bottom left of square
+                                                        drawDot(sp, sp / 2); // bottom right of square
+                                                        break;
+                                                    case 6:
+                                                        // Triangle (left) + Inverted Triangle (right)
+                                                        // Left Triangle (1 top, 2 bottom)
+                                                        drawDot(-sp, -sp / 2); // top
+                                                        drawDot(-sp * 1.5, sp / 2); // bottom left
+                                                        drawDot(-sp * 0.5, sp / 2); // bottom right
+
+                                                        // Right Inverted Triangle (2 top, 1 bottom)
+                                                        drawDot(sp * 0.5, -sp / 2); // top left
+                                                        drawDot(sp * 1.5, -sp / 2); // top right
+                                                        drawDot(sp, sp / 2); // bottom center
+                                                        break;
+                                                    case 7:
+                                                        // Triangle (left) + Square (right)
+                                                        // Left Triangle (1 top, 2 bottom)
+                                                        drawDot(-sp * 1.5, -sp / 2); // top
+                                                        drawDot(-sp * 2, sp / 2); // bottom left
+                                                        drawDot(-sp, sp / 2); // bottom right
+
+                                                        // Right Square (2x2)
+                                                        drawDot(0, -sp / 2); // top left
+                                                        drawDot(sp, -sp / 2); // top right
+                                                        drawDot(0, sp / 2); // bottom left
+                                                        drawDot(sp, sp / 2); // bottom right
+                                                        break;
+                                                    case 8:
+                                                        // 2 rows of 4
+                                                        drawDot(-sp * 1.5, -sp / 2);
+                                                        drawDot(-sp / 2, -sp / 2);
+                                                        drawDot(sp / 2, -sp / 2);
+                                                        drawDot(sp * 1.5, -sp / 2);
+                                                        drawDot(-sp * 1.5, sp / 2);
+                                                        drawDot(-sp / 2, sp / 2);
+                                                        drawDot(sp / 2, sp / 2);
+                                                        drawDot(sp * 1.5, sp / 2);
+                                                        break;
+                                                }
+                                            } catch (err) {
+                                                console.error('Error drawing limit cut:', err);
+                                            }
+                                        }}
+                                    />
+                                </Container>
+                            )}
+
                             {player.name && (
                                 <Text
                                     text={player.name}

@@ -5,9 +5,11 @@ interface ConfigMenuProps {
     onUpdate: (newConfig: Partial<ArenaConfig>) => void;
     onSetDebuffs: () => void;
     onClearDebuffs: () => void;
+    onLimitCut: () => void;
+    onClearLimitCut: () => void;
 }
 
-const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs }: ConfigMenuProps) => {
+const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut }: ConfigMenuProps) => {
     return (
         <div style={{
             backgroundColor: 'rgba(30, 30, 30, 0.9)',
@@ -61,7 +63,7 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs }: ConfigMe
 
             <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '15px 0' }} />
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                 <button
                     onClick={onSetDebuffs}
                     style={{
@@ -95,8 +97,44 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs }: ConfigMe
                     Clear Debuffs
                 </button>
             </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                    onClick={onLimitCut}
+                    style={{
+                        background: '#5bc0de',
+                        border: '1px solid #46b8da',
+                        color: 'white',
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '12px',
+                        flex: 1
+                    }}
+                >
+                    Limit Cut
+                </button>
+                <button
+                    onClick={onClearLimitCut}
+                    style={{
+                        background: '#d9534f',
+                        border: '1px solid #d43f3a',
+                        color: 'white',
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '12px',
+                        flex: 1
+                    }}
+                >
+                    Clear LC
+                </button>
+            </div>
         </div>
     );
 };
 
 export default ConfigMenu;
+

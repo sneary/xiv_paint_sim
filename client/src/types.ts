@@ -6,6 +6,7 @@ export interface Player {
     name: string;
     color: number;
     debuffs: number[];
+    limitCut?: number; // 1-8, for Limit Cut mechanic
 }
 
 export interface ArenaConfig {
