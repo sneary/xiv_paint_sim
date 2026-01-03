@@ -33,7 +33,7 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs }: ConfigMe
             </div>
 
             <div style={{ marginBottom: '10px' }}>
-                <label style={{ marginRight: '10px' }}>Presets:</label>
+                <label style={{ marginRight: '10px' }}>Waymarks:</label>
                 <select
                     value={config.waymarkPreset || 'custom'}
                     onChange={(e) => onUpdate({ waymarkPreset: e.target.value })}
