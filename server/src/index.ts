@@ -146,6 +146,12 @@ io.on('connection', (socket) => {
         io.emit('stateUpdate', gameState);
     });
 
+    socket.on('addText', (textObj) => {
+        if (!gameState.text) gameState.text = [];
+        gameState.text.push(textObj);
+        io.emit('stateUpdate', gameState);
+    });
+
     socket.on('drawPoint', (data: { id: string, x: number, y: number }) => {
         // console.log('drawPoint', data);
         const stroke = gameState.strokes.find(s => s.id === data.id);
