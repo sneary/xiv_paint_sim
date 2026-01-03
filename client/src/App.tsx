@@ -9,6 +9,7 @@ import type { GameState, ArenaConfig } from './types';
 import LandingPage from './components/LandingPage';
 import PartyList from './components/PartyList';
 import DebuffMenu from './components/DebuffMenu';
+import WaymarkMenu from './components/WaymarkMenu';
 
 // In production (Single Service), we want to connect to the same origin (relative path)
 // If VITE_SOCKET_URL is set (e.g. for split hosting), use that.
@@ -265,10 +266,19 @@ function App() {
   const [selectedColor, setSelectedColor] = useState<number>(0xff0000);
   const [lineWidth, setLineWidth] = useState<number>(3);
   const [tool, setTool] = useState<'brush' | 'eraser'>('brush');
+  const [activeMarker, setActiveMarker] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const currentStrokeIdRef = useRef<string | null>(null);
 
+
+
   const startStroke = (x: number, y: number) => {
+    // If placing a marker, do that instead of drawing
+    if (activeMarker) {
+      socketRef.current?.emit('placeMarker', { type: activeMarker, x, y });
+      return;
+    }
+
     const id = Math.random().toString(36).substr(2, 9);
     currentStrokeIdRef.current = id;
     setIsDrawing(true);
@@ -283,6 +293,7 @@ function App() {
   };
 
   const moveStroke = (x: number, y: number) => {
+    if (activeMarker) return;
     if (!isDrawing || !currentStrokeIdRef.current) return;
     socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x, y });
   };
@@ -582,6 +593,18 @@ function App() {
             </div>
           </div>
 
+          {!isMobile && (
+            <WaymarkMenu
+              activeMarker={activeMarker}
+              onSelect={(m) => {
+                setActiveMarker(m);
+                if (m) setTool('brush'); // Ensure brush isn't eraser? Or purely visual.
+              }}
+              onClearAll={() => socketRef.current?.emit('clearMarkers')}
+            />
+          )}
+
+
         </div>
       )}
 
@@ -597,6 +620,7 @@ function App() {
         onStrokeEnd={endStroke}
         scale={scale}
         honkingPlayers={honkingPlayers}
+        markers={gameState.markers}
       />
     </div>
   );

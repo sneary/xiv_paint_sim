@@ -1,4 +1,4 @@
-import { Stage, Graphics, Container, Text } from '@pixi/react'; import * as PIXI from 'pixi.js';
+import { Stage, Graphics, Container, Text, Sprite } from '@pixi/react'; import * as PIXI from 'pixi.js';
 import { useCallback } from 'react';
 import type { Player, ArenaConfig, Stroke } from '../types';
 
@@ -12,9 +12,10 @@ interface ArenaProps {
     onStrokeEnd: () => void;
     scale?: number;
     honkingPlayers?: Record<string, number>;
+    markers?: Record<string, { x: number, y: number }>;
 }
 
-const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1, honkingPlayers = {} }: ArenaProps) => {
+const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1, honkingPlayers = {}, markers = {} }: ArenaProps) => {
     return (
         <Stage
             width={800 * scale}
@@ -132,6 +133,24 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                         }
                     }}
                 />
+
+                {/* Waymarks Layer */}
+                <Container>
+                    {markers && Object.entries(markers).map(([type, pos]) => {
+                        const size = 40; // Size of waymark
+                        return (
+                            <Sprite
+                                key={type}
+                                image={`/waymarks/${type}.png`}
+                                x={pos.x}
+                                y={pos.y}
+                                width={size}
+                                height={size}
+                                anchor={0.5}
+                            />
+                        );
+                    })}
+                </Container>
 
                 {/* Players */}
                 {Object.values(players).map((player) => {

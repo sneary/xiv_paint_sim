@@ -32,6 +32,7 @@ export interface GameState {
     players: Record<string, Player>;
     config: ArenaConfig;
     strokes: Stroke[];
+    markers: Record<string, Point>;
 }
 
 export const initialState: GameState = {
@@ -43,4 +44,5 @@ export const initialState: GameState = {
         showGrid: false
     },
     strokes: [],
+    markers: {}
 };

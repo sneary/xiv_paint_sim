@@ -152,6 +152,27 @@ io.on('connection', (socket) => {
         io.emit('stateUpdate', gameState);
     });
 
+    socket.on('placeMarker', (data: { type: string, x: number, y: number }) => {
+        // Enforce Valid Types
+        const validTypes = ['1', '2', '3', '4', 'A', 'B', 'C', 'D'];
+        if (validTypes.includes(data.type)) {
+            gameState.markers[data.type] = { x: data.x, y: data.y };
+            io.emit('stateUpdate', gameState);
+        }
+    });
+
+    socket.on('removeMarker', (type: string) => {
+        if (gameState.markers[type]) {
+            delete gameState.markers[type];
+            io.emit('stateUpdate', gameState);
+        }
+    });
+
+    socket.on('clearMarkers', () => {
+        gameState.markers = {};
+        io.emit('stateUpdate', gameState);
+    });
+
     socket.on('disconnect', () => {
         console.log('User disconnected:', socket.id);
         delete gameState.players[socket.id];

@@ -33,4 +33,5 @@ export interface GameState {
     players: Record<string, Player>;
     config: ArenaConfig;
     strokes: Stroke[];
+    markers: Record<string, Point>; // Key: '1'|'2'... Value: {x,y}
 }
