@@ -655,6 +655,43 @@ function App() {
                 Clear
               </button>
             </div>
+
+            {/* Save/Load */}
+            <div style={{ display: 'flex', gap: '5px' }}>
+              <button
+                onClick={handleSave}
+                style={{
+                  padding: '8px',
+                  background: '#4CAF50',
+                  border: '1px solid #388E3C',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer'
+                }}
+              >
+                Save
+              </button>
+              <label style={{
+                padding: '8px',
+                background: '#2196F3',
+                border: '1px solid #1976D2',
+                borderRadius: '4px',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: 0
+              }}>
+                Load
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={handleLoad}
+                  style={{ display: 'none' }}
+                />
+              </label>
+            </div>
           </div>
 
           {/* Line Width Slider */}
