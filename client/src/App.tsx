@@ -20,7 +20,8 @@ function App() {
   const [gameState, setGameState] = useState<GameState>({
     players: {},
     config: { shape: 'circle', width: 500, height: 500 },
-    strokes: []
+    strokes: [],
+    markers: {}
   });
   const socketRef = useRef<Socket | null>(null);
   const myIdRef = useRef<string | null>(null);
