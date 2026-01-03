@@ -316,10 +316,13 @@ function App() {
   const [showDebuffMenu, setShowDebuffMenu] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);
 
-  const handleApplyDebuffs = (updates: Record<string, number[]>) => {
+  const handleApplyDebuffs = (updates: Record<string, number[]>, useCountdown: boolean) => {
     if (socketRef.current) {
-      // Use the new countdown event instead of immediate update
-      socketRef.current.emit('startDebuffCountdown', updates);
+      if (useCountdown) {
+        socketRef.current.emit('startDebuffCountdown', updates);
+      } else {
+        socketRef.current.emit('updateDebuffs', updates);
+      }
     }
   };
 

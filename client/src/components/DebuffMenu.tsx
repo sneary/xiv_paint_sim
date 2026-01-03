@@ -3,7 +3,7 @@ import type { Player } from '../types';
 
 interface DebuffMenuProps {
     players: Record<string, Player>;
-    onApply: (updates: Record<string, number[]>) => void;
+    onApply: (updates: Record<string, number[]>, useCountdown: boolean) => void;
     onClose: () => void;
 }
 
@@ -34,14 +34,16 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
         });
     };
 
-    const handleConfirm = () => {
-        onApply(localDebuffs);
+    const handleConfirm = (useCountdown: boolean) => {
+        onApply(localDebuffs, useCountdown);
         onClose();
     };
 
     return (
         <div style={{
             position: 'absolute',
+            // ... (omitting middle lines using existing context if possible, but replace_file_content works on contiguous blocks. 
+            // I will replace the button section at the bottom)
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
@@ -104,7 +106,21 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
                 <div style={{ flex: 1 }}></div>
 
                 <button
-                    onClick={handleConfirm}
+                    onClick={() => handleConfirm(false)}
+                    style={{
+                        padding: '8px 16px',
+                        background: '#e67e22',
+                        border: 'none',
+                        color: 'white',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold'
+                    }}
+                >
+                    Instant
+                </button>
+                <button
+                    onClick={() => handleConfirm(true)}
                     style={{
                         padding: '8px 16px',
                         background: '#4a90e2',
@@ -115,7 +131,7 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
                         fontWeight: 'bold'
                     }}
                 >
-                    Confirm
+                    Countdown
                 </button>
             </div>
         </div>
