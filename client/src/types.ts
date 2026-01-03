@@ -30,9 +30,19 @@ export interface Stroke {
     isComplete?: boolean; // Potentially for optimization or logic
 }
 
+export interface TextObject {
+    id: string;
+    x: number;
+    y: number;
+    text: string;
+    color: number;
+    fontSize: number;
+}
+
 export interface GameState {
     players: Record<string, Player>;
     config: ArenaConfig;
     strokes: Stroke[];
-    markers: Record<string, Point>; // Key: '1'|'2'... Value: {x,y}
+    markers: Record<string, Point>;
+    text: TextObject[];
 }

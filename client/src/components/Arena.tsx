@@ -15,9 +15,10 @@ interface ArenaProps {
     markers?: Record<string, { x: number, y: number }>;
     // Preview for current line tool
     linePreview?: { x1: number, y1: number, x2: number, y2: number } | null;
+    text?: { id: string, x: number, y: number, text: string, color: number, fontSize: number }[];
 }
 
-const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1, honkingPlayers = {}, markers = {}, linePreview }: ArenaProps) => {
+const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1, honkingPlayers = {}, markers = {}, linePreview, text = [] }: ArenaProps) => {
     return (
         <Stage
             width={800 * scale}
@@ -69,11 +70,6 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
 
                             // Line Preview
                             if (linePreview) {
-                                // For now assume white or last selected color? 
-                                // Actually we don't pass selectedColor to Arena. 
-                                // Let's simplify and make it white or a distinct "preview" color like Yellow/Green, 
-                                // OR modify strokes to include the partial stroke. 
-                                // But passing it as a separate prop is cleaner.
                                 g.lineStyle(2, 0xFFFFFF, 0.8); // White dashed/solid
                                 g.moveTo(linePreview.x1, linePreview.y1);
                                 g.lineTo(linePreview.x2, linePreview.y2);
@@ -84,6 +80,26 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                         }
                     }, [strokes, linePreview])}
                 />
+
+                {/* Text Layer */}
+                <Container>
+                    {text && text.map((t) => (
+                        <Text
+                            key={t.id}
+                            text={t.text}
+                            x={t.x}
+                            y={t.y}
+                            anchor={0.5}
+                            style={new PIXI.TextStyle({
+                                fill: t.color,
+                                fontSize: t.fontSize || 20,
+                                fontFamily: 'Arial',
+                                stroke: '#000000',
+                                strokeThickness: 3
+                            })}
+                        />
+                    ))}
+                </Container>
 
                 {/* Background / Arena Boundary */}
                 <Graphics

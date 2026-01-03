@@ -29,11 +29,21 @@ export interface Stroke {
     isEraser?: boolean;
 }
 
+export interface TextObject {
+    id: string;
+    x: number;
+    y: number;
+    text: string;
+    color: number;
+    fontSize: number;
+}
+
 export interface GameState {
     players: Record<string, Player>;
     config: ArenaConfig;
     strokes: Stroke[];
     markers: Record<string, Point>;
+    text: TextObject[];
 }
 
 export const initialState: GameState = {
@@ -45,5 +55,6 @@ export const initialState: GameState = {
         showGrid: false
     },
     strokes: [],
-    markers: {}
+    markers: {},
+    text: []
 };

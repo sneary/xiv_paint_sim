@@ -21,7 +21,8 @@ function App() {
     players: {},
     config: { shape: 'circle', width: 500, height: 500 },
     strokes: [],
-    markers: {}
+    markers: {},
+    text: []
   });
   const socketRef = useRef<Socket | null>(null);
   const myIdRef = useRef<string | null>(null);
@@ -266,7 +267,7 @@ function App() {
 
   const [selectedColor, setSelectedColor] = useState<number>(0xff0000);
   const [lineWidth, setLineWidth] = useState<number>(3);
-  const [tool, setTool] = useState<'brush' | 'eraser' | 'line'>('brush');
+  const [tool, setTool] = useState<'brush' | 'eraser' | 'line' | 'text'>('brush');
   const [activeMarker, setActiveMarker] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [linePreview, setLinePreview] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null);
@@ -276,6 +277,21 @@ function App() {
     // If placing a marker, do that instead of drawing
     if (activeMarker) {
       socketRef.current?.emit('placeMarker', { type: activeMarker, x, y });
+      return;
+    }
+
+    if (tool === 'text') {
+      const text = prompt('Enter text:');
+      if (text) {
+        socketRef.current?.emit('addText', {
+          id: Math.random().toString(36).substr(2, 9),
+          x,
+          y,
+          text,
+          color: selectedColor,
+          fontSize: Math.max(12, lineWidth * 2) // Scale font with line width
+        });
+      }
       return;
     }
 
@@ -355,7 +371,8 @@ function App() {
     const saveData = {
       config: gameState.config,
       strokes: gameState.strokes,
-      markers: gameState.markers
+      markers: gameState.markers,
+      text: gameState.text
     };
     const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -625,6 +642,20 @@ function App() {
               >
                 Line
               </button>
+              <button
+                onClick={() => setTool('text')}
+                style={{
+                  padding: '8px',
+                  background: tool === 'text' ? '#4a90e2' : '#333',
+                  border: '1px solid #555',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  flex: 1
+                }}
+              >
+                Text
+              </button>
 
               <button
                 onClick={() => socketRef.current?.emit('undoStroke')}
@@ -754,6 +785,7 @@ function App() {
         honkingPlayers={honkingPlayers}
         markers={gameState.markers}
         linePreview={linePreview}
+        text={gameState.text}
       />
     </div>
   );
