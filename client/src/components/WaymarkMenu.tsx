@@ -8,13 +8,6 @@ interface WaymarkMenuProps {
 
 const MARKERS = ['A', 'B', 'C', 'D', '1', '2', '3', '4'];
 
-const COLORS: Record<string, string> = {
-    'A': '#ff4d4d', '1': '#ff4d4d',
-    'B': '#ffff4d', '2': '#ffff4d',
-    'C': '#4d4dff', '3': '#4d4dff',
-    'D': '#be4dff', '4': '#be4dff'
-};
-
 const WaymarkMenu: React.FC<WaymarkMenuProps> = ({ activeMarker, onSelect, onClearAll }) => {
     return (
         <div style={{
@@ -32,8 +25,6 @@ const WaymarkMenu: React.FC<WaymarkMenuProps> = ({ activeMarker, onSelect, onCle
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                 {MARKERS.map(m => {
                     const isSelected = activeMarker === m;
-                    const color = COLORS[m];
-                    const isSquare = ['1', '2', '3', '4'].includes(m);
 
                     return (
                         <button
