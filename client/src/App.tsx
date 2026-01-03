@@ -351,6 +351,43 @@ function App() {
     }
   };
 
+  const handleSave = () => {
+    const saveData = {
+      config: gameState.config,
+      strokes: gameState.strokes,
+      markers: gameState.markers
+    };
+    const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `xiv-sim-save-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (socketRef.current) {
+          socketRef.current.emit('restoreState', json);
+        }
+      } catch (err) {
+        console.error('Failed to parse save file', err);
+        alert('Invalid save file');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    e.target.value = '';
+  };
+
   // Debuff Menu State
   const [showDebuffMenu, setShowDebuffMenu] = useState(false);
   const [countdown, setCountdown] = useState<string | null>(null);

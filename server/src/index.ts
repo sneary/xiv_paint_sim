@@ -171,6 +171,17 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('restoreState', (savedState: any) => {
+        // Basic validation
+        if (savedState && typeof savedState === 'object') {
+            if (Array.isArray(savedState.strokes)) gameState.strokes = savedState.strokes;
+            if (savedState.markers) gameState.markers = savedState.markers;
+            if (savedState.config) gameState.config = { ...gameState.config, ...savedState.config };
+
+            io.emit('stateUpdate', gameState);
+        }
+    });
+
     socket.on('clearStrokes', () => {
         console.log('Clearing all strokes');
         gameState.strokes = [];
