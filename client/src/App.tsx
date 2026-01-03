@@ -363,7 +363,8 @@ function App() {
         />
       )}
 
-      {/* Existing Config Menu Logic... handled above in code flow but visual placement next */}
+      {/* Config Menu */}
+
 
       {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>}
 
@@ -372,10 +373,10 @@ function App() {
         {!isMobile && <><br />Use W/A/S/D to move. Press Space to Honk. Click and drag in arena to paint.</>}
       </div>
 
-      {/* Party List and Debuff Button Container */}
+      {/* Party List Container */}
       <div style={{
         position: 'absolute',
-        top: isMobile ? 50 : 170, // Mobile: Top center (below buttons). Desktop: Left column.
+        top: isMobile ? 50 : 320, // Mobile: Top center. Desktop: Left column (lower to clear Config Menu).
         left: isMobile ? '50%' : 20,
         transform: isMobile ? 'translateX(-50%)' : 'none',
         display: 'flex',
@@ -385,47 +386,6 @@ function App() {
         zIndex: 150 // Ensure above arena
       }}>
         <PartyList players={gameState.players} myId={myId} />
-
-        <button
-          onClick={() => setShowDebuffMenu(true)}
-          style={{
-            background: '#333',
-            border: '1px solid #555',
-            color: '#eee',
-            padding: '5px 10px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontFamily: "'Outfit', sans-serif",
-            fontSize: '12px',
-            width: '100%' // Match Party List width roughly
-          }}
-        >
-          Set Debuffs
-        </button>
-        <button
-          onClick={() => {
-            if (socketRef.current) {
-              const updates: Record<string, number[]> = {};
-              Object.keys(gameState.players).forEach(id => {
-                updates[id] = [];
-              });
-              socketRef.current.emit('updateDebuffs', updates);
-            }
-          }}
-          style={{
-            background: '#d9534f',
-            border: '1px solid #d43f3a',
-            color: 'white',
-            padding: '5px 10px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontFamily: "'Outfit', sans-serif",
-            fontSize: '12px',
-            width: '100%'
-          }}
-        >
-          Clear Debuffs
-        </button>
       </div>
 
       {/* Countdown Overlay */}
@@ -464,7 +424,20 @@ function App() {
       {(showConfig || !isMobile) && (
         <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 120 }}>
           <div style={{ position: 'relative' }}>
-            <ConfigMenu config={gameState.config} onUpdate={handleConfigUpdate} />
+            <ConfigMenu
+              config={gameState.config}
+              onUpdate={handleConfigUpdate}
+              onSetDebuffs={() => setShowDebuffMenu(true)}
+              onClearDebuffs={() => {
+                if (socketRef.current) {
+                  const updates: Record<string, number[]> = {};
+                  Object.keys(gameState.players).forEach(id => {
+                    updates[id] = [];
+                  });
+                  socketRef.current.emit('updateDebuffs', updates);
+                }
+              }}
+            />
             {isMobile && (
               <button
                 onClick={() => setShowConfig(false)}

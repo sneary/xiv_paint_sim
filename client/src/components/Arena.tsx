@@ -174,7 +174,11 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                             {/* Debuffs - Render above Name */}
                             {player.debuffs && player.debuffs.length > 0 && (
                                 <Container x={0} y={isSpectator ? -20 : -45}>
-                                    {player.debuffs.map((color, i) => {
+                                    {player.debuffs.map((colorVal, i) => {
+                                        // Ensure color is a valid number
+                                        let finalColor = typeof colorVal === 'number' ? colorVal : parseInt(colorVal, 16);
+                                        if (isNaN(finalColor)) finalColor = 0xFFFFFF;
+
                                         const count = player.debuffs.length;
                                         const spacing = 12;
                                         const startX = -((count - 1) * spacing) / 2;
@@ -183,11 +187,15 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                                                 key={i}
                                                 x={startX + i * spacing}
                                                 draw={(g) => {
-                                                    g.clear();
-                                                    g.beginFill(color);
-                                                    g.lineStyle(1, 0x000000);
-                                                    g.drawCircle(0, 0, 5);
-                                                    g.endFill();
+                                                    try {
+                                                        g.clear();
+                                                        g.beginFill(finalColor);
+                                                        g.lineStyle(1, 0x000000);
+                                                        g.drawCircle(0, 0, 5);
+                                                        g.endFill();
+                                                    } catch (err) {
+                                                        console.error('Error drawing debuff:', err);
+                                                    }
                                                 }}
                                             />
                                         );

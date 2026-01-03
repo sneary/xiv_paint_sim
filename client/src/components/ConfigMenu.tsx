@@ -3,9 +3,11 @@ import type { ArenaConfig } from '../types';
 interface ConfigMenuProps {
     config: ArenaConfig;
     onUpdate: (newConfig: Partial<ArenaConfig>) => void;
+    onSetDebuffs: () => void;
+    onClearDebuffs: () => void;
 }
 
-const ConfigMenu = ({ config, onUpdate }: ConfigMenuProps) => {
+const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs }: ConfigMenuProps) => {
     return (
         <div style={{
             backgroundColor: 'rgba(30, 30, 30, 0.9)',
@@ -42,14 +44,42 @@ const ConfigMenu = ({ config, onUpdate }: ConfigMenuProps) => {
                 </label>
             </div>
 
-            {/* <div style={{ fontSize: '0.8rem', color: '#aaa' }}>
-                {config.shape === 'circle' ? (
-                     `Radius: ${config.width / 2}`
-                ) : (
-                     `Size: ${config.width}x${config.height}`
-                )} 
-            </div> */ // Commenting out or simply removing the whole block is better.
-            }
+            <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '15px 0' }} />
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                    onClick={onSetDebuffs}
+                    style={{
+                        background: '#333',
+                        border: '1px solid #555',
+                        color: '#eee',
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '12px',
+                        flex: 1
+                    }}
+                >
+                    Set Debuffs
+                </button>
+                <button
+                    onClick={onClearDebuffs}
+                    style={{
+                        background: '#d9534f',
+                        border: '1px solid #d43f3a',
+                        color: 'white',
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '12px',
+                        flex: 1
+                    }}
+                >
+                    Clear Debuffs
+                </button>
+            </div>
         </div>
     );
 };
