@@ -265,12 +265,11 @@ function App() {
 
   const [selectedColor, setSelectedColor] = useState<number>(0xff0000);
   const [lineWidth, setLineWidth] = useState<number>(3);
-  const [tool, setTool] = useState<'brush' | 'eraser'>('brush');
+  const [tool, setTool] = useState<'brush' | 'eraser' | 'line'>('brush');
   const [activeMarker, setActiveMarker] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [linePreview, setLinePreview] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null);
   const currentStrokeIdRef = useRef<string | null>(null);
-
-
 
   const startStroke = (x: number, y: number) => {
     // If placing a marker, do that instead of drawing
@@ -282,23 +281,51 @@ function App() {
     const id = Math.random().toString(36).substr(2, 9);
     currentStrokeIdRef.current = id;
     setIsDrawing(true);
-    socketRef.current?.emit('startStroke', {
-      id,
-      x,
-      y,
-      color: selectedColor,
-      width: lineWidth,
-      isEraser: tool === 'eraser'
-    });
+
+    if (tool === 'line') {
+      setLinePreview({ x1: x, y1: y, x2: x, y2: y });
+      // We don't emit startStroke yet for line, or we do?
+      // If we emit startStroke, it creates a 1-point stroke.
+      // Let's emit it so it exists, but we won't stream points.
+      socketRef.current?.emit('startStroke', {
+        id,
+        x,
+        y,
+        color: selectedColor,
+        width: lineWidth,
+        isEraser: false
+      });
+    } else {
+      socketRef.current?.emit('startStroke', {
+        id,
+        x,
+        y,
+        color: selectedColor,
+        width: lineWidth,
+        isEraser: tool === 'eraser'
+      });
+    }
   };
 
   const moveStroke = (x: number, y: number) => {
     if (activeMarker) return;
     if (!isDrawing || !currentStrokeIdRef.current) return;
+
+    if (tool === 'line') {
+      setLinePreview(prev => prev ? { ...prev, x2: x, y2: y } : null);
+      return;
+    }
+
     socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x, y });
   };
 
   const endStroke = () => {
+    if (tool === 'line' && linePreview && currentStrokeIdRef.current) {
+      // Emit the final point to complete the line
+      socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x: linePreview.x2, y: linePreview.y2 });
+      setLinePreview(null);
+    }
+
     setIsDrawing(false);
     currentStrokeIdRef.current = null;
     socketRef.current?.emit('endStroke');
@@ -546,6 +573,20 @@ function App() {
                 Eraser
               </button>
               <button
+                onClick={() => setTool('line')}
+                style={{
+                  padding: '8px',
+                  background: tool === 'line' ? '#4a90e2' : '#333',
+                  border: '1px solid #555',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  flex: 1
+                }}
+              >
+                Line
+              </button>
+              <button
                 onClick={handleClear}
                 style={{
                   padding: '8px',
@@ -621,6 +662,7 @@ function App() {
         scale={scale}
         honkingPlayers={honkingPlayers}
         markers={gameState.markers}
+        linePreview={linePreview}
       />
     </div>
   );

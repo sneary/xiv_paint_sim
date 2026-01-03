@@ -20,35 +20,23 @@ def crop_waymarks(image_path, output_dir):
         newData = []
         for item in datas:
             # Change all black (also dark dark gray) pixels to transparent
-            # Threshold: if r<20 and g<20 and b<20?
-            if item[0] < 30 and item[1] < 30 and item[2] < 30:
+            # Increased threshold to 50 to clear more noise/glow that might inflate bbox
+            if item[0] < 50 and item[1] < 50 and item[2] < 50:
                 newData.append((0, 0, 0, 0))
             else:
                 newData.append(item)
         img.putdata(newData)
         
-        # Now find bounding boxes of non-transparent regions
-        # This is harder with raw PIL.
-        # Let's just do a grid split since it looks very regular.
-        # Or use getbbox() on crops.
-        
-        # Let's try to detect 8 distinct objects.
-        # Scan for empty rows/cols?
-        
-        # Actually, let's just dump the image info first to debug or just write a smart splitter using simple projection.
-        
         width, height = img.size
         print(f"Image size: {width}x{height}")
         
-        # Project to Y axis to find rows
-        # Check for empty lines (fully transparent)
-        
         # Simplified approach: 2 columns, 4 rows.
-        # Let's assume roughly equal grid.
         cell_w = width // 2
         cell_h = height // 4
         
         names = ['1', '2', '3', '4', 'A', 'B', 'C', 'D']
+        
+        TARGET_SIZE = 128
         
         for i, name in enumerate(names):
             row = i // 2
@@ -62,13 +50,27 @@ def crop_waymarks(image_path, output_dir):
             # Crop the cell
             cell = img.crop((left, top, right, bottom))
             
-            # Trim the cell (remove excess transparent space)
+            # Trim the cell to content
             bbox = cell.getbbox()
             if bbox:
                 cell = cell.crop(bbox)
                 
-            cell.save(os.path.join(output_dir, f"{name}.png"))
-            print(f"Saved {name}.png")
+            # Resize logic: Fit into TARGET_SIZE x TARGET_SIZE maintaining aspect ratio
+            w, h = cell.size
+            ratio = min(TARGET_SIZE / w, TARGET_SIZE / h)
+            new_w = int(w * ratio)
+            new_h = int(h * ratio)
+            
+            cell = cell.resize((new_w, new_h), Image.Resampling.LANCZOS)
+            
+            # Create final square canvas
+            final_img = Image.new("RGBA", (TARGET_SIZE, TARGET_SIZE), (0, 0, 0, 0))
+            offset_x = (TARGET_SIZE - new_w) // 2
+            offset_y = (TARGET_SIZE - new_h) // 2
+            final_img.paste(cell, (offset_x, offset_y))
+            
+            final_img.save(os.path.join(output_dir, f"{name}.png"))
+            print(f"Saved {name}.png normalized to {TARGET_SIZE}x{TARGET_SIZE}")
             
     except Exception as e:
         print(f"Error: {e}")

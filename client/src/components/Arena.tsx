@@ -13,9 +13,11 @@ interface ArenaProps {
     scale?: number;
     honkingPlayers?: Record<string, number>;
     markers?: Record<string, { x: number, y: number }>;
+    // Preview for current line tool
+    linePreview?: { x1: number, y1: number, x2: number, y2: number } | null;
 }
 
-const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1, honkingPlayers = {}, markers = {} }: ArenaProps) => {
+const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, onStrokeEnd, scale = 1, honkingPlayers = {}, markers = {}, linePreview }: ArenaProps) => {
     return (
         <Stage
             width={800 * scale}
@@ -51,16 +53,11 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                     draw={useCallback((g: PIXI.Graphics) => {
                         try {
                             g.clear();
-                            if (strokes.length > 0) {
-                                // console.log(`[RENDER] Drawing ${strokes.length} strokes`);
-                            }
+                            // Existing Strokes
                             strokes.forEach((stroke) => {
                                 if (!stroke || !stroke.points || stroke.points.length < 2) return;
-                                // Ensure color is a number
                                 const color = typeof stroke.color === 'number' ? stroke.color : parseInt(stroke.color as any, 16) || 0xffffff;
-
                                 const width = stroke.width || 3;
-                                // If eraser, paint with background color (0x101010)
                                 const finalColor = stroke.isEraser ? 0x101010 : color;
 
                                 g.lineStyle(width, finalColor, 1);
@@ -69,10 +66,23 @@ const Arena = ({ players, myId, config, strokes, onStrokeStart, onStrokeMove, on
                                     g.lineTo(stroke.points[i].x, stroke.points[i].y);
                                 }
                             });
+
+                            // Line Preview
+                            if (linePreview) {
+                                // For now assume white or last selected color? 
+                                // Actually we don't pass selectedColor to Arena. 
+                                // Let's simplify and make it white or a distinct "preview" color like Yellow/Green, 
+                                // OR modify strokes to include the partial stroke. 
+                                // But passing it as a separate prop is cleaner.
+                                g.lineStyle(2, 0xFFFFFF, 0.8); // White dashed/solid
+                                g.moveTo(linePreview.x1, linePreview.y1);
+                                g.lineTo(linePreview.x2, linePreview.y2);
+                            }
+
                         } catch (err) {
                             console.error('Error drawing strokes:', err);
                         }
-                    }, [strokes])}
+                    }, [strokes, linePreview])}
                 />
 
                 {/* Background / Arena Boundary */}
