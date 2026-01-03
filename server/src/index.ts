@@ -83,6 +83,20 @@ io.on('connection', (socket) => {
                 '3': { x: cx + 100, y: cy + 100 }, // SE
                 '4': { x: cx - 100, y: cy + 100 }  // SW
             };
+        } else if (newConfig.waymarkPreset === 'waymarks-2') {
+            const cx = 400;
+            const cy = 300;
+            const d = 150;
+            gameState.markers = {
+                '1': { x: cx - d, y: cy - d }, // NW
+                'A': { x: cx, y: cy - d },     // N
+                '2': { x: cx + d, y: cy - d }, // NE
+                'D': { x: cx - d, y: cy },     // W
+                'B': { x: cx + d, y: cy },     // E
+                '4': { x: cx - d, y: cy + d }, // SW
+                'C': { x: cx, y: cy + d },     // S
+                '3': { x: cx + d, y: cy + d }  // SE
+            };
         }
 
         gameState.config = { ...gameState.config, ...newConfig };

@@ -41,6 +41,7 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs }: ConfigMe
                 >
                     <option value="custom">Custom</option>
                     <option value="waymarks-1">Waymarks 1</option>
+                    <option value="waymarks-2">Waymarks 2</option>
                 </select>
             </div>
 
