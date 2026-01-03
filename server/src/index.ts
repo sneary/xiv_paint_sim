@@ -97,6 +97,36 @@ io.on('connection', (socket) => {
                 'C': { x: cx, y: cy + d },     // S
                 '3': { x: cx + d, y: cy + d }  // SE
             };
+        } else if (newConfig.waymarkPreset === 'waymarks-3') {
+            const cx = 400;
+            const cy = 300;
+            const far = 150;
+            const near = 100;
+            gameState.markers = {
+                '1': { x: cx - far, y: cy - far }, // NW (Far)
+                '2': { x: cx + far, y: cy - far }, // NE (Far)
+                '3': { x: cx + far, y: cy + far }, // SE (Far)
+                '4': { x: cx - far, y: cy + far }, // SW (Far)
+                'A': { x: cx, y: cy - near },      // N (Near)
+                'B': { x: cx + near, y: cy },      // E (Near)
+                'C': { x: cx, y: cy + near },      // S (Near)
+                'D': { x: cx - near, y: cy }       // W (Near)
+            };
+        } else if (newConfig.waymarkPreset === 'waymarks-4') {
+            const cx = 400;
+            const cy = 300;
+            const cardinalDist = 200;
+            const interDist = 100;
+            gameState.markers = {
+                '1': { x: cx - interDist, y: cy - interDist }, // NW
+                '2': { x: cx + interDist, y: cy - interDist }, // NE
+                '3': { x: cx + interDist, y: cy + interDist }, // SE
+                '4': { x: cx - interDist, y: cy + interDist }, // SW
+                'A': { x: cx, y: cy - cardinalDist },          // N
+                'B': { x: cx + cardinalDist, y: cy },          // E
+                'C': { x: cx, y: cy + cardinalDist },          // S
+                'D': { x: cx - cardinalDist, y: cy }           // W
+            };
         }
 
         gameState.config = { ...gameState.config, ...newConfig };
@@ -132,6 +162,13 @@ io.on('connection', (socket) => {
     socket.on('endStroke', () => {
         // distinct end event might not be needed for state mod if points are just added
         // but useful if we want to "finalize" a stroke or cleanup
+    });
+
+    socket.on('undoStroke', () => {
+        if (gameState.strokes.length > 0) {
+            gameState.strokes.pop();
+            io.emit('stateUpdate', gameState);
+        }
     });
 
     socket.on('clearStrokes', () => {

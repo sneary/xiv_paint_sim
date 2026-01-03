@@ -588,6 +588,20 @@ function App() {
                 Line
               </button>
               <button
+                onClick={() => socketRef.current?.emit('undoStroke')}
+                style={{
+                  padding: '8px',
+                  background: '#ff9800',
+                  border: '1px solid #e68900',
+                  borderRadius: '4px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  flex: 1
+                }}
+              >
+                Undo
+              </button>
+              <button
                 onClick={handleClear}
                 style={{
                   padding: '8px',
