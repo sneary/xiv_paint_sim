@@ -133,6 +133,8 @@ io.on('connection', (socket) => {
         io.emit('stateUpdate', gameState);
     });
 
+    const actionHistory: { type: 'stroke' | 'text', id: string }[] = [];
+
     socket.on('startStroke', (data: { id: string, x: number, y: number, color: number, width?: number, isEraser?: boolean }) => {
         console.log('startStroke received', data.id);
         const newStroke = {
@@ -143,12 +145,14 @@ io.on('connection', (socket) => {
             isEraser: !!data.isEraser
         };
         gameState.strokes.push(newStroke);
+        actionHistory.push({ type: 'stroke', id: data.id });
         io.emit('stateUpdate', gameState);
     });
 
     socket.on('addText', (textObj) => {
         if (!gameState.text) gameState.text = [];
         gameState.text.push(textObj);
+        actionHistory.push({ type: 'text', id: textObj.id });
         io.emit('stateUpdate', gameState);
     });
 
@@ -171,9 +175,29 @@ io.on('connection', (socket) => {
     });
 
     socket.on('undoStroke', () => {
-        if (gameState.strokes.length > 0) {
-            gameState.strokes.pop();
+        const lastAction = actionHistory.pop();
+        if (lastAction) {
+            if (lastAction.type === 'stroke') {
+                const index = gameState.strokes.findIndex(s => s.id === lastAction.id);
+                if (index !== -1) {
+                    gameState.strokes.splice(index, 1);
+                }
+            } else if (lastAction.type === 'text') {
+                if (gameState.text) {
+                    const index = gameState.text.findIndex(t => t.id === lastAction.id);
+                    if (index !== -1) {
+                        gameState.text.splice(index, 1);
+                    }
+                }
+            }
             io.emit('stateUpdate', gameState);
+        } else {
+            // Fallback for legacy/save-loaded state where history might be empty
+            // Try to undo last stroke if available
+            if (gameState.strokes.length > 0) {
+                gameState.strokes.pop();
+                io.emit('stateUpdate', gameState);
+            }
         }
     });
 
@@ -182,7 +206,11 @@ io.on('connection', (socket) => {
         if (savedState && typeof savedState === 'object') {
             if (Array.isArray(savedState.strokes)) gameState.strokes = savedState.strokes;
             if (savedState.markers) gameState.markers = savedState.markers;
+            if (Array.isArray(savedState.text)) gameState.text = savedState.text;
             if (savedState.config) gameState.config = { ...gameState.config, ...savedState.config };
+
+            // Clear history on load to prevent weird states
+            actionHistory.length = 0;
 
             io.emit('stateUpdate', gameState);
         }
@@ -191,6 +219,8 @@ io.on('connection', (socket) => {
     socket.on('clearStrokes', () => {
         console.log('Clearing all strokes');
         gameState.strokes = [];
+        gameState.text = [];
+        actionHistory.length = 0;
         io.emit('stateUpdate', gameState);
     });
 
