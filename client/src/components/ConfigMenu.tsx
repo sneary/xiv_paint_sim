@@ -33,6 +33,18 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs }: ConfigMe
             </div>
 
             <div style={{ marginBottom: '10px' }}>
+                <label style={{ marginRight: '10px' }}>Presets:</label>
+                <select
+                    value={config.waymarkPreset || 'custom'}
+                    onChange={(e) => onUpdate({ waymarkPreset: e.target.value })}
+                    style={{ padding: '4px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
+                >
+                    <option value="custom">Custom</option>
+                    <option value="waymarks-1">Waymarks 1</option>
+                </select>
+            </div>
+
+            <div style={{ marginBottom: '10px' }}>
                 <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
                     <input
                         type="checkbox"

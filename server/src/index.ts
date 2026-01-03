@@ -68,6 +68,23 @@ io.on('connection', (socket) => {
 
     socket.on('updateConfig', (newConfig: any) => {
         // Basic validation could go here
+
+        // If waymarkPreset is 'waymarks-1', apply preset markers
+        if (newConfig.waymarkPreset === 'waymarks-1') {
+            const cx = 400;
+            const cy = 300;
+            gameState.markers = {
+                'A': { x: cx, y: cy - 150 },      // North
+                'B': { x: cx + 150, y: cy },      // East
+                'C': { x: cx, y: cy + 150 },      // South
+                'D': { x: cx - 150, y: cy },      // West
+                '1': { x: cx - 100, y: cy - 100 }, // NW
+                '2': { x: cx + 100, y: cy - 100 }, // NE
+                '3': { x: cx + 100, y: cy + 100 }, // SE
+                '4': { x: cx - 100, y: cy + 100 }  // SW
+            };
+        }
+
         gameState.config = { ...gameState.config, ...newConfig };
         io.emit('stateUpdate', gameState);
     });

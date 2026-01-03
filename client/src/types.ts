@@ -13,6 +13,7 @@ export interface ArenaConfig {
     width: number;
     height: number;
     showGrid?: boolean;
+    waymarkPreset?: string;
 }
 
 export interface Point {
