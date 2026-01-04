@@ -170,6 +170,16 @@ function App() {
     };
   }, []);
 
+  // Keepalive Loop for Cloud Run (Serverless) anti-throttling
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (socketRef.current) {
+        socketRef.current.emit('keepalive');
+      }
+    }, 15000); // Send heartbeat every 15s to keep server CPU awake
+    return () => clearInterval(interval);
+  }, []);
+
   const handleJoin = (data: { action: 'create' | 'join', roomId?: string, name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => {
     if (socketRef.current) {
       socketRef.current.emit('joinGame', data);

@@ -433,6 +433,11 @@ io.on('connection', (socket: Socket) => {
         }
     });
 
+
+    socket.on('keepalive', () => {
+        // No-op: just processing the packet wakes the Cloud Run CPU loop
+    });
+
     socket.on('disconnect', () => {
         if (currentRoomId && rooms[currentRoomId]) {
             console.log(`User ${socket.id} disconnected from room ${currentRoomId}`);
