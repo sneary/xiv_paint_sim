@@ -33,7 +33,18 @@ function App() {
   const [isJoined, setIsJoined] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [joinError, setJoinError] = useState('');
+
   const [countdown, setCountdown] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+
+  // Store join options for auto-reconnect
+  const lastJoinOptions = useRef<{
+    action: 'create' | 'join',
+    roomId?: string,
+    name: string,
+    color: number,
+    role: 'tank' | 'healer' | 'dps' | 'spectator'
+  } | null>(null);
 
   // Movement state
   const keysPressed = useRef<Record<string, boolean>>({});
@@ -110,6 +121,21 @@ function App() {
 
     newSocket.on('connect', () => {
       console.log('Connected to server');
+      setIsConnected(true);
+
+      // Auto-rejoin if we were previously in a game
+      if (lastJoinOptions.current) {
+        console.log('Auto-rejoining game...');
+        // Add a small delay to ensure server is ready or to avoid race conditions
+        setTimeout(() => {
+          newSocket.emit('joinGame', lastJoinOptions.current);
+        }, 100);
+      }
+    });
+
+    newSocket.on('disconnect', () => {
+      console.log('Disconnected from server');
+      setIsConnected(false);
     });
 
     newSocket.on('stateUpdate', (newState: GameState) => {
@@ -181,6 +207,9 @@ function App() {
   }, []);
 
   const handleJoin = (data: { action: 'create' | 'join', roomId?: string, name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => {
+    // Save for auto-reconnect
+    lastJoinOptions.current = data;
+
     if (socketRef.current) {
       socketRef.current.emit('joinGame', data);
     }
@@ -528,6 +557,36 @@ function App() {
         pointerEvents: 'none'
       }}>
         Room: <span style={{ color: 'white', fontWeight: 'bold' }}>{roomId}</span>
+      </div>
+
+      {/* Connection Status Indicator */}
+      <div style={{
+        position: 'absolute',
+        top: '40px', // Below Room ID
+        right: isMobile ? '60px' : '10px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        padding: '5px 10px',
+        borderRadius: '4px',
+        background: 'rgba(0,0,0,0.4)',
+        pointerEvents: 'none',
+        zIndex: 1000
+      }}>
+        <div style={{
+          width: '8px',
+          height: '8px',
+          borderRadius: '50%',
+          backgroundColor: isConnected ? '#4CAF50' : '#f44336',
+          boxShadow: isConnected ? '0 0 5px #4CAF50' : 'none'
+        }} />
+        <span style={{
+          fontSize: '12px',
+          color: isConnected ? 'rgba(255,255,255,0.7)' : '#ff6b6b',
+          fontWeight: isConnected ? 'normal' : 'bold'
+        }}>
+          {isConnected ? 'Connected' : 'Reconnecting...'}
+        </span>
       </div>
 
       {/* ... (Config Toggle, Menu, Joystick, Tools Toggle, Color Picker) code omitted for brevity in search, focusing on insertion point */}
