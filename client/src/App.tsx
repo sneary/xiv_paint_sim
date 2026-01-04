@@ -37,6 +37,7 @@ function App() {
 
   // Movement state
   const keysPressed = useRef<Record<string, boolean>>({});
+  const lastMoveEmit = useRef<number>(0);
 
 
   // Joystick state
@@ -306,7 +307,11 @@ function App() {
 
         // 2. Send to Server (Throttle this? For now, per frame movement emit might be high load but smoothest)
         // Optimization: Could throttle network sends to 20-30hz while simulating locally at high FPS.
-        socket.emit('move', { x: newX, y: newY });
+        const now = performance.now();
+        if (now - lastMoveEmit.current > 30) { // ~33 updates per second
+          socket.emit('move', { x: newX, y: newY });
+          lastMoveEmit.current = now;
+        }
       }
     };
 
