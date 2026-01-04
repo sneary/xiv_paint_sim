@@ -38,6 +38,8 @@ function App() {
   // Movement state
   const keysPressed = useRef<Record<string, boolean>>({});
   const lastMoveEmit = useRef<number>(0);
+  // Physics state: Track position independently of React state to avoid frame drops/stutter
+  const localPlayerRef = useRef<{ x: number, y: number } | null>(null);
 
 
   // Joystick state
@@ -115,6 +117,10 @@ function App() {
     });
 
     newSocket.on('playerMoved', (data: { id: string, x: number, y: number }) => {
+      // Ignore our own movement from server to prevent rubberbanding/stuttering
+      // We are already updating locally in the animation loop.
+      if (data.id === newSocket.id) return;
+
       setGameState(prev => {
         if (!prev.players[data.id]) return prev; // Player not found (race condition?)
         return {
@@ -259,6 +265,15 @@ function App() {
 
       if (!me) return;
 
+      // Initialize or Sync Physics State if stale (e.g. teleported/respawned externally?)
+      // Actually, we generally trust local physics over server for position.
+      if (!localPlayerRef.current) {
+        localPlayerRef.current = { x: me.x, y: me.y };
+      }
+
+      // Physics Calculation
+      let { x: currentX, y: currentY } = localPlayerRef.current;
+
       let dx = 0;
       let dy = 0;
       // Previous: 5px per 20ms = 250px per second
@@ -280,8 +295,8 @@ function App() {
       }
 
       if (dx !== 0 || dy !== 0) {
-        let newX = me.x + dx;
-        let newY = me.y + dy;
+        let newX = currentX + dx;
+        let newY = currentY + dy;
 
         // Boundary Checks - Keep within Drawable Area (Canvas 800x600)
         // We ignore the arena shape (Circle/Square) effectively allowing players to run "out of bounds" mechanic-wise,
@@ -294,6 +309,9 @@ function App() {
         // Clamp to 800x600
         newX = Math.max(playerRadius, Math.min(newX, 800 - playerRadius));
         newY = Math.max(playerRadius, Math.min(newY, 600 - playerRadius));
+
+        // Update Physics State Immediately
+        localPlayerRef.current = { x: newX, y: newY };
 
         // 1. Optimistic Local Update (Client Prediction)
         // We update our own state IMMEDIATELY so it feels responsive
