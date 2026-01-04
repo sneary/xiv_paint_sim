@@ -167,6 +167,12 @@ function App() {
       setRoomId(data.roomId);
       setIsJoined(true);
       setJoinError('');
+
+      // Update persistence so if we crash/reconnect, we rejoin THIS room, not create a new one
+      if (lastJoinOptions.current) {
+        lastJoinOptions.current.roomId = data.roomId;
+        lastJoinOptions.current.action = 'join';
+      }
     });
 
     newSocket.on('joinError', (msg: string) => {
@@ -227,6 +233,18 @@ function App() {
     socketRef.current?.emit('changePage', index);
   };
 
+
+  const handleCheckRoom = (roomId: string) => {
+    return new Promise<{ exists: boolean, takenNames: string[], takenColors: number[] }>((resolve) => {
+      if (!socketRef.current) {
+        resolve({ exists: false, takenNames: [], takenColors: [] });
+        return;
+      }
+      socketRef.current.emit('checkRoom', roomId, (response: any) => {
+        resolve(response);
+      });
+    });
+  };
 
   // Input handling setup
   useEffect(() => {
@@ -473,18 +491,29 @@ function App() {
   };
 
   const handleSave = () => {
-    const saveData = {
-      pages: gameState.pages,
-      currentPageIndex: gameState.currentPageIndex
-    };
-    const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `xiv-sim-save-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const saveData = {
+        pages: gameState.pages,
+        currentPageIndex: gameState.currentPageIndex
+      };
+      const json = JSON.stringify(saveData, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `xiv-sim-save-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup after a small delay to ensure the download triggers
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+    } catch (err) {
+      console.error('Save failed', err);
+      alert('Failed to save file');
+    }
   };
 
   const handleLoad = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -519,7 +548,10 @@ function App() {
   if (!isJoined) {
     return (
       <div className="app-container">
-        <LandingPage onJoin={handleJoin} />
+        <LandingPage
+          onJoin={handleJoin}
+          onCheckRoom={handleCheckRoom}
+        />
         {joinError && (
           <div style={{
             position: 'absolute',

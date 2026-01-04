@@ -128,6 +128,23 @@ io.on('connection', (socket: Socket) => {
 
     // --- All other events must check currentRoomId ---
 
+    // Pre-flight check for Landing Page
+    socket.on('checkRoom', (roomId: string, callback: (response: { exists: boolean, takenNames: string[], takenColors: number[] }) => void) => {
+        const rId = roomId?.toUpperCase();
+        if (!rId || !rooms[rId]) {
+            callback({ exists: false, takenNames: [], takenColors: [] });
+            return;
+        }
+
+        const gs = rooms[rId];
+        const players = Object.values(gs.players);
+        const takenNames = players.map(p => p.name);
+        // Only count colors of non-spectators
+        const takenColors = players.filter(p => p.role !== 'spectator').map(p => p.color);
+
+        callback({ exists: true, takenNames, takenColors });
+    });
+
     socket.on('move', (pos: { x: number; y: number }) => {
         if (currentRoomId && rooms[currentRoomId]) {
             const gs = rooms[currentRoomId];

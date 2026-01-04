@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './LandingPage.css';
 
 interface LandingPageProps {
     onJoin: (data: { action: 'create' | 'join', roomId?: string, name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => void;
+    onCheckRoom: (roomId: string) => Promise<{ exists: boolean, takenNames: string[], takenColors: number[] }>;
 }
 
 const COLORS = [
@@ -10,7 +11,7 @@ const COLORS = [
     0xff00ff, 0x00ffff, 0xffffff, 0xCC5500
 ];
 
-const LandingPage = ({ onJoin }: LandingPageProps) => {
+const LandingPage = ({ onJoin, onCheckRoom }: LandingPageProps) => {
 
     const [mode, setMode] = useState<'create' | 'join'>('create');
     const [roomId, setRoomId] = useState('');
@@ -19,9 +20,60 @@ const LandingPage = ({ onJoin }: LandingPageProps) => {
     const [selectedRole, setSelectedRole] = useState<'tank' | 'healer' | 'dps' | 'spectator'>('dps');
     const [error, setError] = useState('');
 
+    // Validation State
+    const [takenColors, setTakenColors] = useState<number[]>([]);
+    const [takenNames, setTakenNames] = useState<string[]>([]);
+    const [roomExists, setRoomExists] = useState<boolean | null>(null);
+
     const isSpectator = selectedRole === 'spectator';
 
     // Auto-select logic removed as we don't have takenColors yet
+
+    // Check room when ID changes
+    useEffect(() => {
+        if (mode === 'join' && roomId.length === 4) {
+            onCheckRoom(roomId).then(data => {
+                if (!data.exists) {
+                    setRoomExists(false);
+                    setError('Room not found');
+                } else {
+                    setRoomExists(true);
+                    setTakenNames(data.takenNames);
+                    setTakenColors(data.takenColors);
+                    setError('');
+                }
+            });
+        } else {
+            setRoomExists(null);
+            setTakenColors([]);
+            setTakenNames([]);
+        }
+    }, [roomId, mode, onCheckRoom]);
+
+    // Auto-select available color if current is taken
+    useEffect(() => {
+        if (mode === 'join' && takenColors.length > 0) {
+            if (takenColors.includes(selectedColor)) {
+                const available = COLORS.find(c => !takenColors.includes(c));
+                if (available !== undefined) {
+                    setSelectedColor(available);
+                }
+            }
+        }
+    }, [takenColors, mode, selectedColor]);
+
+    // Real-time Name Validation
+    useEffect(() => {
+        if (mode === 'join' && name.trim()) {
+            const nameConflict = takenNames.some(n => n.toLowerCase() === name.trim().toLowerCase());
+            if (nameConflict) {
+                setError('Name is taken.');
+            } else {
+                // Only clear error if it was a name error
+                setError(prev => prev === 'Name is taken.' ? '' : prev);
+            }
+        }
+    }, [name, takenNames, mode]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,24 +81,33 @@ const LandingPage = ({ onJoin }: LandingPageProps) => {
 
         if (!name.trim()) return;
 
-        // BasicClient-side validation (Server does authoritative check)
-        if (mode === 'join' && !roomId.trim()) {
-            setError('Please enter a Room Code.');
-            return;
-        }
+        // Basic Client-side validation
+        if (mode === 'join') {
+            if (!roomId.trim()) {
+                setError('Please enter a Room Code.');
+                return;
+            }
+            if (roomId.length !== 4) {
+                setError('Room Code must be 4 characters.');
+                return;
+            }
+            if (roomExists === false) {
+                setError('Room not found');
+                return;
+            }
+            const nameConflict = takenNames.some(n => n.toLowerCase() === name.trim().toLowerCase());
+            if (nameConflict) {
+                setError('Name is taken.');
+                return;
+            }
 
-        if (mode === 'join' && roomId.length !== 4) {
-            setError('Room Code must be 4 characters.');
-            return;
+            if (selectedRole !== 'spectator') {
+                if (takenColors.includes(selectedColor)) {
+                    setError('Color is taken.');
+                    return;
+                }
+            }
         }
-
-        // Note: We can't strictly check isNameTaken/isColorTaken here for 'join' 
-        // because existing players list might be from a different room context 
-        // (or global logic if not yet updated). 
-        // Ideally, LandingPage shouldn't show takenNames/Colors until connected to a room?
-        // Actually, with the new architecture, we don't know who is in the target room until we try to join.
-        // So we will rely on server 'joinError' response instead of pre-emptive check for 'join' mode.
-        // For 'create', it's a new room so it's always empty.
 
         onJoin({
             action: mode,
@@ -130,7 +191,15 @@ const LandingPage = ({ onJoin }: LandingPageProps) => {
                                 placeholder="Enter Name"
                                 maxLength={12}
                                 autoFocus
+                                style={{
+                                    borderColor: error === 'Name is taken.' ? '#ff4444' : undefined
+                                }}
                             />
+                            {error === 'Name is taken.' && (
+                                <div style={{ color: '#ff4444', fontSize: '0.85rem', marginTop: '4px' }}>
+                                    Name is already taken in this room.
+                                </div>
+                            )}
                         </div>
 
                         <div className="form-group">
@@ -166,23 +235,35 @@ const LandingPage = ({ onJoin }: LandingPageProps) => {
                                 <label className="form-label">Ring & Paint Color</label>
                                 <div className="color-grid">
                                     {COLORS.map(color => {
+                                        const isTaken = mode === 'join' && takenColors.includes(color);
                                         return (
                                             <div
                                                 key={color}
-                                                onClick={() => setSelectedColor(color)}
-                                                className={`color-option ${selectedColor === color ? 'selected' : ''}`}
+                                                onClick={() => !isTaken && setSelectedColor(color)}
+                                                className={`color-option ${selectedColor === color ? 'selected' : ''} ${isTaken ? 'taken' : ''}`}
                                                 style={{
                                                     backgroundColor: '#' + color.toString(16).padStart(6, '0'),
                                                     color: '#' + color.toString(16).padStart(6, '0'),
+                                                    opacity: isTaken ? 0.3 : 1,
+                                                    cursor: isTaken ? 'not-allowed' : 'pointer',
+                                                    position: 'relative'
                                                 }}
-                                            />
+                                            >
+                                                {isTaken && <div style={{
+                                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    color: 'white', fontWeight: 'bold', fontSize: '20px', textShadow: '0 0 2px black'
+                                                }}>×</div>}
+                                            </div>
                                         );
                                     })}
                                 </div>
                             </div>
                         )}
 
-                        {error && <div style={{ color: '#ff4444', marginBottom: '10px', textAlign: 'center' }}>{error}</div>}
+                        {error && error !== 'Name is taken.' && (
+                            <div style={{ color: '#ff4444', marginBottom: '10px', textAlign: 'center' }}>{error}</div>
+                        )}
 
                         <button
                             className="join-button"
