@@ -119,163 +119,167 @@ const LandingPage = ({ onJoin, onCheckRoom }: LandingPageProps) => {
     };
 
     return (
-        <div className="landing-container">
-            <div className="landing-content">
-                <div className="title-group">
-                    <h1 className="main-title">FFXIV MSPaint Sim</h1>
-                    <div className="subtitle">Mechanic Training Arena</div>
-                </div>
-
-                <div className="glass-card">
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', gap: '10px' }}>
-                        <button
-                            onClick={() => setMode('create')}
-                            style={{
-                                background: mode === 'create' ? '#e67e22' : 'transparent',
-                                border: '1px solid #e67e22',
-                                color: 'white',
-                                padding: '8px 16px',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontWeight: 'bold'
-                            }}
-                        >
-                            Host New Room
-                        </button>
-                        <button
-                            onClick={() => setMode('join')}
-                            style={{
-                                background: mode === 'join' ? '#4a90e2' : 'transparent',
-                                border: '1px solid #4a90e2',
-                                color: 'white',
-                                padding: '8px 16px',
-                                borderRadius: '4px',
-                                cursor: 'pointer',
-                                fontWeight: 'bold'
-                            }}
-                        >
-                            Join Room
-                        </button>
+        <>
+            <div className="landing-base" />
+            <div className="landing-particles" />
+            <div className="landing-container">
+                <div className="landing-content">
+                    <div className="title-group">
+                        <h1 className="main-title">FFXIV MSPaint Sim</h1>
+                        <div className="subtitle">Mechanic Training Arena</div>
                     </div>
 
-                    <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+                    <div className="glass-card">
+                        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', gap: '10px' }}>
+                            <button
+                                onClick={() => setMode('create')}
+                                style={{
+                                    background: mode === 'create' ? '#e67e22' : 'transparent',
+                                    border: '1px solid #e67e22',
+                                    color: 'white',
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                Host New Room
+                            </button>
+                            <button
+                                onClick={() => setMode('join')}
+                                style={{
+                                    background: mode === 'join' ? '#4a90e2' : 'transparent',
+                                    border: '1px solid #4a90e2',
+                                    color: 'white',
+                                    padding: '8px 16px',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                Join Room
+                            </button>
+                        </div>
 
-                        {mode === 'join' && (
+                        <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+
+                            {mode === 'join' && (
+                                <div className="form-group">
+                                    <label className="form-label">Room Code</label>
+                                    <input
+                                        className="input-field"
+                                        type="text"
+                                        value={roomId}
+                                        onChange={(e) => {
+                                            setRoomId(e.target.value.toUpperCase());
+                                            setError('');
+                                        }}
+                                        placeholder="ABCD"
+                                        maxLength={4}
+                                        style={{ textAlign: 'center', letterSpacing: '4px', fontFamily: 'monospace' }}
+                                    />
+                                </div>
+                            )}
+
                             <div className="form-group">
-                                <label className="form-label">Room Code</label>
+                                <label className="form-label">Character Name</label>
                                 <input
                                     className="input-field"
                                     type="text"
-                                    value={roomId}
+                                    value={name}
                                     onChange={(e) => {
-                                        setRoomId(e.target.value.toUpperCase());
+                                        setName(e.target.value);
                                         setError('');
                                     }}
-                                    placeholder="ABCD"
-                                    maxLength={4}
-                                    style={{ textAlign: 'center', letterSpacing: '4px', fontFamily: 'monospace' }}
+                                    placeholder="Enter Name"
+                                    maxLength={12}
+                                    autoFocus
+                                    style={{
+                                        borderColor: error === 'Name is taken.' ? '#ff4444' : undefined
+                                    }}
                                 />
+                                {error === 'Name is taken.' && (
+                                    <div style={{ color: '#ff4444', fontSize: '0.85rem', marginTop: '4px' }}>
+                                        Name is already taken in this room.
+                                    </div>
+                                )}
                             </div>
-                        )}
 
-                        <div className="form-group">
-                            <label className="form-label">Character Name</label>
-                            <input
-                                className="input-field"
-                                type="text"
-                                value={name}
-                                onChange={(e) => {
-                                    setName(e.target.value);
-                                    setError('');
-                                }}
-                                placeholder="Enter Name"
-                                maxLength={12}
-                                autoFocus
-                                style={{
-                                    borderColor: error === 'Name is taken.' ? '#ff4444' : undefined
-                                }}
-                            />
-                            {error === 'Name is taken.' && (
-                                <div style={{ color: '#ff4444', fontSize: '0.85rem', marginTop: '4px' }}>
-                                    Name is already taken in this room.
+                            <div className="form-group">
+                                <label className="form-label">Role</label>
+                                <div className="role-selector" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                    <div
+                                        className={`role-option tank ${selectedRole === 'tank' ? 'selected' : ''}`}
+                                        onClick={() => setSelectedRole('tank')}
+                                    >Tank</div>
+                                    <div
+                                        className={`role-option healer ${selectedRole === 'healer' ? 'selected' : ''}`}
+                                        onClick={() => setSelectedRole('healer')}
+                                    >Healer</div>
+                                    <div
+                                        className={`role-option dps ${selectedRole === 'dps' ? 'selected' : ''}`}
+                                        onClick={() => setSelectedRole('dps')}
+                                    >DPS</div>
+                                </div>
+                                {/* Spectator Button - Smaller/Separate */}
+                                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                                    <div
+                                        className={`role-option spectator ${selectedRole === 'spectator' ? 'selected' : ''}`}
+                                        onClick={() => setSelectedRole('spectator')}
+                                        style={{ flex: '0 0 auto', padding: '5px 15px', fontSize: '0.9rem', opacity: 0.8 }}
+                                    >
+                                        👁 Spectator (No Slot)
+                                    </div>
+                                </div>
+                            </div>
+
+                            {!isSpectator && (
+                                <div className="form-group">
+                                    <label className="form-label">Ring & Paint Color</label>
+                                    <div className="color-grid">
+                                        {COLORS.map(color => {
+                                            const isTaken = mode === 'join' && takenColors.includes(color);
+                                            return (
+                                                <div
+                                                    key={color}
+                                                    onClick={() => !isTaken && setSelectedColor(color)}
+                                                    className={`color-option ${selectedColor === color ? 'selected' : ''} ${isTaken ? 'taken' : ''}`}
+                                                    style={{
+                                                        backgroundColor: '#' + color.toString(16).padStart(6, '0'),
+                                                        color: '#' + color.toString(16).padStart(6, '0'),
+                                                        opacity: isTaken ? 0.3 : 1,
+                                                        cursor: isTaken ? 'not-allowed' : 'pointer',
+                                                        position: 'relative'
+                                                    }}
+                                                >
+                                                    {isTaken && <div style={{
+                                                        position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                        color: 'white', fontWeight: 'bold', fontSize: '20px', textShadow: '0 0 2px black'
+                                                    }}>×</div>}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
-                        </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Role</label>
-                            <div className="role-selector" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                                <div
-                                    className={`role-option tank ${selectedRole === 'tank' ? 'selected' : ''}`}
-                                    onClick={() => setSelectedRole('tank')}
-                                >Tank</div>
-                                <div
-                                    className={`role-option healer ${selectedRole === 'healer' ? 'selected' : ''}`}
-                                    onClick={() => setSelectedRole('healer')}
-                                >Healer</div>
-                                <div
-                                    className={`role-option dps ${selectedRole === 'dps' ? 'selected' : ''}`}
-                                    onClick={() => setSelectedRole('dps')}
-                                >DPS</div>
-                            </div>
-                            {/* Spectator Button - Smaller/Separate */}
-                            <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
-                                <div
-                                    className={`role-option spectator ${selectedRole === 'spectator' ? 'selected' : ''}`}
-                                    onClick={() => setSelectedRole('spectator')}
-                                    style={{ flex: '0 0 auto', padding: '5px 15px', fontSize: '0.9rem', opacity: 0.8 }}
-                                >
-                                    👁 Spectator (No Slot)
-                                </div>
-                            </div>
-                        </div>
+                            {error && error !== 'Name is taken.' && (
+                                <div style={{ color: '#ff4444', marginBottom: '10px', textAlign: 'center' }}>{error}</div>
+                            )}
 
-                        {!isSpectator && (
-                            <div className="form-group">
-                                <label className="form-label">Ring & Paint Color</label>
-                                <div className="color-grid">
-                                    {COLORS.map(color => {
-                                        const isTaken = mode === 'join' && takenColors.includes(color);
-                                        return (
-                                            <div
-                                                key={color}
-                                                onClick={() => !isTaken && setSelectedColor(color)}
-                                                className={`color-option ${selectedColor === color ? 'selected' : ''} ${isTaken ? 'taken' : ''}`}
-                                                style={{
-                                                    backgroundColor: '#' + color.toString(16).padStart(6, '0'),
-                                                    color: '#' + color.toString(16).padStart(6, '0'),
-                                                    opacity: isTaken ? 0.3 : 1,
-                                                    cursor: isTaken ? 'not-allowed' : 'pointer',
-                                                    position: 'relative'
-                                                }}
-                                            >
-                                                {isTaken && <div style={{
-                                                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-                                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                    color: 'white', fontWeight: 'bold', fontSize: '20px', textShadow: '0 0 2px black'
-                                                }}>×</div>}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {error && error !== 'Name is taken.' && (
-                            <div style={{ color: '#ff4444', marginBottom: '10px', textAlign: 'center' }}>{error}</div>
-                        )}
-
-                        <button
-                            className="join-button"
-                            type="submit"
-                            disabled={!name.trim() || (mode === 'join' && roomId.length !== 4)}
-                        >
-                            {isSpectator ? 'Watch Game' : (mode === 'create' ? 'Create Room' : 'Join Room')}
-                        </button>
-                    </form>
+                            <button
+                                className="join-button"
+                                type="submit"
+                                disabled={!name.trim() || (mode === 'join' && roomId.length !== 4)}
+                            >
+                                {isSpectator ? 'Watch Game' : (mode === 'create' ? 'Create Room' : 'Join Room')}
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
 
