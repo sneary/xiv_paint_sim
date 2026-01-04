@@ -211,8 +211,12 @@ io.on('connection', (socket: Socket) => {
             color: data.color,
             points: [{ x: data.x, y: data.y }],
             width: data.width || 3,
-            isEraser: !!data.isEraser
+            isEraser: !!data.isEraser,
+            type: data.type || 'freehand'
         });
+        if (!page.actionHistory) page.actionHistory = [];
+        page.actionHistory.push('stroke');
+
         io.to(currentRoomId).emit('stateUpdate', gs);
     });
 
@@ -222,6 +226,10 @@ io.on('connection', (socket: Socket) => {
         const page = gs.pages[gs.currentPageIndex];
         if (!page.text) page.text = [];
         page.text.push(textObj);
+
+        if (!page.actionHistory) page.actionHistory = [];
+        page.actionHistory.push('text');
+
         io.to(currentRoomId).emit('stateUpdate', gs);
     });
 
@@ -243,10 +251,22 @@ io.on('connection', (socket: Socket) => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
         const gs = rooms[currentRoomId];
         const page = gs.pages[gs.currentPageIndex];
-        // Ideally we'd have a per-room action history. For now, pop strokes.
-        if (page.strokes.length > 0) {
-            page.strokes.pop();
+        // Ideally we'd have a per-room action history.
+        // Check actionHistory first
+        if (page.actionHistory && page.actionHistory.length > 0) {
+            const lastAction = page.actionHistory.pop();
+            if (lastAction === 'stroke') {
+                if (page.strokes.length > 0) page.strokes.pop();
+            } else if (lastAction === 'text') {
+                if (page.text && page.text.length > 0) page.text.pop();
+            }
             io.to(currentRoomId).emit('stateUpdate', gs);
+        } else {
+            // Legacy fallback if no history (or old rooms)
+            if (page.strokes.length > 0) {
+                page.strokes.pop();
+                io.to(currentRoomId).emit('stateUpdate', gs);
+            }
         }
     });
 

@@ -28,6 +28,7 @@ export interface Stroke {
     points: Point[];
     width: number;
     isEraser?: boolean;
+    type?: 'freehand' | 'line' | 'circle' | 'donut';
 }
 
 export interface TextObject {
@@ -45,6 +46,8 @@ export interface Page {
     strokes: Stroke[];
     markers: Record<string, Point>;
     text: TextObject[];
+    // History of actions for Undo: 'stroke' | 'text'
+    actionHistory?: string[];
 }
 
 export interface GameState {
@@ -67,7 +70,8 @@ export const initialState: GameState = {
             },
             strokes: [],
             markers: {},
-            text: []
+            text: [],
+            actionHistory: []
         }
     ]
 };

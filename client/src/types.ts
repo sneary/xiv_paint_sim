@@ -20,6 +20,7 @@ export interface Stroke {
     points: Point[];
     width: number;
     isEraser?: boolean;
+    type?: 'freehand' | 'line' | 'circle' | 'donut';
 }
 
 export interface TextObject {
@@ -45,6 +46,7 @@ export interface Page {
     strokes: Stroke[];
     markers: Record<string, Point>;
     text: TextObject[];
+    actionHistory?: string[];
 }
 
 export interface GameState {

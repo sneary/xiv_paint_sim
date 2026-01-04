@@ -404,11 +404,26 @@ function App() {
 
   const [selectedColor, setSelectedColor] = useState<number>(0xff0000);
   const [lineWidth, setLineWidth] = useState<number>(3);
-  const [tool, setTool] = useState<'brush' | 'eraser' | 'line' | 'text'>('brush');
+  const [tool, setTool] = useState<'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle'>('brush');
+
+  // Clear text input when tool changes
+  useEffect(() => {
+    setTextInput(null);
+  }, [tool]);
   const [activeMarker, setActiveMarker] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [linePreview, setLinePreview] = useState<{ x1: number, y1: number, x2: number, y2: number } | null>(null);
+  const [shapePreview, setShapePreview] = useState<{ x: number, y: number, r: number } | null>(null);
   const [textInput, setTextInput] = useState<{ x: number, y: number, value: string } | null>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (textInput && textInputRef.current) {
+      // slight delay to ensure render? usually not needed with effect, but safety
+      setTimeout(() => textInputRef.current?.focus(), 0);
+    }
+  }, [textInput]);
+
   const currentStrokeIdRef = useRef<string | null>(null);
 
   const startStroke = (x: number, y: number) => {
@@ -416,6 +431,32 @@ function App() {
     if (activeMarker) {
       socketRef.current?.emit('placeMarker', { type: activeMarker, x, y });
       return;
+    }
+
+    // If we have an active text input, commit it first (unless we just clicked it, but the input prevents clicks to canvas propagation usually? 
+    // Actually, Input is DOM, Canvas is below. Clicking Input doesn't trigger startStroke. Clicking canvas does.
+    if (textInput) {
+      if (textInput.value.trim()) {
+        socketRef.current?.emit('addText', {
+          id: Math.random().toString(36).substr(2, 9),
+          x: textInput.x,
+          y: textInput.y,
+          text: textInput.value,
+          color: selectedColor,
+          fontSize: Math.max(12, lineWidth * 2)
+        });
+      }
+      setTextInput(null);
+      // If we are in text tool, we want to start a NEW text input at this location
+      if (tool === 'text') {
+        setTextInput({ x, y, value: '' });
+        setIsDrawing(false);
+        return;
+      }
+      // If we are NOT in text tool (unreachable due to useEffect clearing checking tool? No, maybe useEffect hasn't run yet if we just clicked? 
+      // Actually if tool changed, input is gone. So this is for when we are IN text tool and click elsewhere.
+      // But wait, if I am in Brush mode, `textInput` should be null. 
+      // So this block mainly handles "I am in text mode, I have an open input, and I clicked elsewhere".
     }
 
     if (tool === 'text') {
@@ -430,16 +471,25 @@ function App() {
 
     if (tool === 'line') {
       setLinePreview({ x1: x, y1: y, x2: x, y2: y });
-      // We don't emit startStroke yet for line, or we do?
-      // If we emit startStroke, it creates a 1-point stroke.
-      // Let's emit it so it exists, but we won't stream points.
       socketRef.current?.emit('startStroke', {
         id,
         x,
         y,
         color: selectedColor,
         width: lineWidth,
-        isEraser: false
+        isEraser: false,
+        type: 'line'
+      });
+    } else if (tool === 'donut' || tool === 'circle') {
+      setShapePreview({ x, y, r: 0 });
+      socketRef.current?.emit('startStroke', {
+        id,
+        x,
+        y,
+        color: selectedColor,
+        width: lineWidth,
+        isEraser: false,
+        type: tool // 'donut' or 'circle'
       });
     } else {
       socketRef.current?.emit('startStroke', {
@@ -448,7 +498,8 @@ function App() {
         y,
         color: selectedColor,
         width: lineWidth,
-        isEraser: tool === 'eraser'
+        isEraser: tool === 'eraser',
+        type: 'freehand'
       });
     }
   };
@@ -462,6 +513,17 @@ function App() {
       return;
     }
 
+    if (tool === 'donut' || tool === 'circle') {
+      // Calculate radius
+      // circlePreview has x,y (center).
+      setShapePreview(prev => {
+        if (!prev) return null;
+        const r = Math.sqrt(Math.pow(x - prev.x, 2) + Math.pow(y - prev.y, 2));
+        return { ...prev, r };
+      });
+      return;
+    }
+
     socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x, y });
   };
 
@@ -470,6 +532,12 @@ function App() {
       // Emit the final point to complete the line
       socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x: linePreview.x2, y: linePreview.y2 });
       setLinePreview(null);
+    }
+
+    if ((tool === 'donut' || tool === 'circle') && shapePreview && currentStrokeIdRef.current) {
+      // We emit the final point which determines the radius (Center is Point 0, Radius Point is Point 1)
+      socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x: shapePreview.x + shapePreview.r, y: shapePreview.y });
+      setShapePreview(null);
     }
 
     setIsDrawing(false);
@@ -761,77 +829,49 @@ function App() {
             {/* Tools */}
             <div>
               <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Tools</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div className="tool-grid">
                 <button
+                  className={`tool-button ${tool === 'eraser' ? 'active' : ''}`}
                   onClick={() => setTool('eraser')}
-                  style={{
-                    padding: '8px',
-                    background: tool === 'eraser' ? '#4a90e2' : '#333',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    flex: 1
-                  }}
                 >
                   Eraser
                 </button>
                 <button
+                  className={`tool-button ${tool === 'line' ? 'active' : ''}`}
                   onClick={() => setTool('line')}
-                  style={{
-                    padding: '8px',
-                    background: tool === 'line' ? '#4a90e2' : '#333',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    flex: 1
-                  }}
                 >
                   Line
                 </button>
                 <button
+                  className={`tool-button ${tool === 'donut' ? 'active' : ''}`}
+                  onClick={() => setTool('donut')}
+                >
+                  Donut
+                </button>
+                <button
+                  className={`tool-button ${tool === 'circle' ? 'active' : ''}`}
+                  onClick={() => setTool('circle')}
+                >
+                  Circle
+                </button>
+                <button
+                  className={`tool-button ${tool === 'text' ? 'active' : ''}`}
                   onClick={() => setTool('text')}
-                  style={{
-                    padding: '8px',
-                    background: tool === 'text' ? '#4a90e2' : '#333',
-                    border: '1px solid #555',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    flex: 1
-                  }}
                 >
                   Text
                 </button>
-
                 <button
+                  className="tool-button warning"
                   onClick={() => socketRef.current?.emit('undoStroke')}
-                  style={{
-                    padding: '8px',
-                    background: '#ff9800',
-                    border: '1px solid #e68900',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    flex: 1
-                  }}
                 >
                   Undo
                 </button>
                 <button
+                  className="tool-button danger"
                   onClick={handleClear}
-                  style={{
-                    padding: '8px',
-                    background: '#d9534f',
-                    border: '1px solid #d43f3a',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer',
-                    flex: 1
-                  }}
+                  style={{ gridColumn: 'span 2' }}
                 >
-                  Clear
+                  Clear All
                 </button>
               </div>
 
@@ -982,29 +1022,31 @@ function App() {
       <div style={{ position: 'relative', width: 800 * scale, height: 600 * scale }}>
         <Arena
           players={gameState.players}
-          myId={myId}
-          config={currentPage.config}
-          strokes={currentPage.strokes}
+          myId={socketRef.current?.id}
+          config={gameState.pages[gameState.currentPageIndex].config}
+          strokes={gameState.pages[gameState.currentPageIndex].strokes}
           onStrokeStart={startStroke}
           onStrokeMove={moveStroke}
           onStrokeEnd={endStroke}
           scale={scale}
           honkingPlayers={honkingPlayers}
-          markers={currentPage.markers}
+          markers={gameState.pages[gameState.currentPageIndex].markers}
           linePreview={linePreview}
-          text={currentPage.text}
+          shapePreview={shapePreview}
+          text={gameState.pages[gameState.currentPageIndex].text}
           currentTool={tool}
           currentColor={selectedColor}
           currentWidth={lineWidth}
         />
         {textInput && (
           <input
+            ref={textInputRef}
             autoFocus
             style={{
               position: 'absolute',
               left: textInput.x * scale,
               top: textInput.y * scale,
-              transform: 'translate(-50%, -50%)',
+              transform: 'translate(0, -100%)',
               zIndex: 1000,
               background: 'rgba(0,0,0,0.5)',
               color: '#' + selectedColor.toString(16).padStart(6, '0'),
@@ -1035,7 +1077,10 @@ function App() {
                 setTextInput(null);
               }
             }}
-            onBlur={() => setTextInput(null)}
+            onBlur={() => {
+              // We do NOT auto-close on blur anymore to prevent premature closing.
+              // Instead, we rely on startStroke or tool change or Enter/Esc to close it.
+            }}
           />
         )}
       </div>

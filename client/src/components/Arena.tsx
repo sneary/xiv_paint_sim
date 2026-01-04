@@ -15,8 +15,9 @@ interface ArenaProps {
     markers?: Record<string, { x: number, y: number }>;
     // Preview for current line tool
     linePreview?: { x1: number, y1: number, x2: number, y2: number } | null;
+    shapePreview?: { x: number, y: number, r: number } | null;
     text?: { id: string, x: number, y: number, text: string, color: number, fontSize: number }[];
-    currentTool?: 'brush' | 'eraser' | 'line' | 'text';
+    currentTool?: 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle';
     currentColor?: number;
     currentWidth?: number;
 }
@@ -33,6 +34,7 @@ const Arena = ({
     honkingPlayers = {},
     markers = {},
     linePreview,
+    shapePreview,
     text = [],
     currentTool = 'brush',
     currentColor = 0xff0000,
@@ -49,7 +51,7 @@ const Arena = ({
     const updateCursorPos = (x: number, y: number) => {
         if (cursorRef.current) {
             cursorRef.current.position.set(x, y);
-            cursorRef.current.visible = currentTool !== 'text';
+            cursorRef.current.visible = true;
         }
     };
     return (
@@ -111,15 +113,38 @@ const Arena = ({
                                     join: PIXI.LINE_JOIN.ROUND
                                 });
 
-                                if (stroke.points.length === 1) {
-                                    g.lineStyle(0); // Clear stroke to avoid adding width to the circle
-                                    g.beginFill(finalColor);
-                                    g.drawCircle(stroke.points[0].x, stroke.points[0].y, width / 2);
+                                if ((stroke.type === 'donut' || stroke.type === 'circle') && stroke.points.length >= 2) {
+                                    const center = stroke.points[0];
+                                    const radiusPoint = stroke.points[stroke.points.length - 1];
+                                    const r = Math.sqrt(Math.pow(radiusPoint.x - center.x, 2) + Math.pow(radiusPoint.y - center.y, 2));
+
+                                    g.lineStyle({
+                                        width,
+                                        color: finalColor,
+                                        alpha: 1,
+                                    });
+                                    if (stroke.type === 'circle') {
+                                        g.beginFill(finalColor, 0.5); // Filled circle (with some transparency?) User said "completely filled". Let's do 1.0 or 0.5? Usually 1.0 or user default.
+                                        // Wait, user said "completely filled with color". Maybe opacity depends on something else?
+                                        // Let's use 1.0 alpha for fill if it's "paint".
+                                        g.beginFill(finalColor, 1.0);
+                                    } else {
+                                        g.beginFill(0, 0); // Donut: No fill
+                                    }
+                                    g.drawCircle(center.x, center.y, r);
                                     g.endFill();
                                 } else {
-                                    g.moveTo(stroke.points[0].x, stroke.points[0].y);
-                                    for (let i = 1; i < stroke.points.length; i++) {
-                                        g.lineTo(stroke.points[i].x, stroke.points[i].y);
+                                    // Handle Freehand / Line (Legacy)
+                                    if (stroke.points.length === 1) {
+                                        g.lineStyle(0);
+                                        g.beginFill(finalColor);
+                                        g.drawCircle(stroke.points[0].x, stroke.points[0].y, width / 2);
+                                        g.endFill();
+                                    } else {
+                                        g.moveTo(stroke.points[0].x, stroke.points[0].y);
+                                        for (let i = 1; i < stroke.points.length; i++) {
+                                            g.lineTo(stroke.points[i].x, stroke.points[i].y);
+                                        }
                                     }
                                 }
                             });
@@ -131,10 +156,22 @@ const Arena = ({
                                 g.lineTo(linePreview.x2, linePreview.y2);
                             }
 
+                            // Shape Preview
+                            if (shapePreview) {
+                                g.lineStyle(2, 0xFFFFFF, 0.8);
+                                if (currentTool === 'circle') {
+                                    g.beginFill(currentColor || 0xff0000, 1.0);
+                                } else {
+                                    g.beginFill(0, 0);
+                                }
+                                g.drawCircle(shapePreview.x, shapePreview.y, shapePreview.r);
+                                g.endFill();
+                            }
+
                         } catch (err) {
                             console.error('Error drawing strokes:', err);
                         }
-                    }, [strokes, linePreview])}
+                    }, [strokes, linePreview, shapePreview, currentTool, currentColor])}
                 />
 
 
@@ -147,7 +184,7 @@ const Arena = ({
                             text={t.text}
                             x={t.x}
                             y={t.y}
-                            anchor={0.5}
+                            anchor={[0, 1]}
                             style={new PIXI.TextStyle({
                                 fill: t.color,
                                 fontSize: t.fontSize || 20,
@@ -245,14 +282,17 @@ const Arena = ({
                         if (currentTool === 'text') {
                             const color = currentColor || 0xff0000;
                             g.lineStyle(2, color, 1);
-                            // Draw I-beam
-                            g.moveTo(0, -10);
-                            g.lineTo(0, 10);
+                            // Calculate anticipated font size to match App.tsx logic
+                            const fontSize = Math.max(12, currentWidth * 2);
+
+                            // Draw I-beam (Shifted up to match text box anchor)
+                            g.moveTo(0, -fontSize);
+                            g.lineTo(0, 0);
                             // Serifs
-                            g.moveTo(-5, -10);
-                            g.lineTo(5, -10);
-                            g.moveTo(-5, 10);
-                            g.lineTo(5, 10);
+                            g.moveTo(-5, -fontSize);
+                            g.lineTo(5, -fontSize);
+                            g.moveTo(-5, 0);
+                            g.lineTo(5, 0);
 
                             g.visible = true;
                             return;
