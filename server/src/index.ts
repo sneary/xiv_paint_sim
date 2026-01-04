@@ -134,7 +134,9 @@ io.on('connection', (socket: Socket) => {
             if (gs.players[socket.id]) {
                 gs.players[socket.id].x = pos.x;
                 gs.players[socket.id].y = pos.y;
-                io.to(currentRoomId).emit('stateUpdate', gs);
+                // Optimization: Don't broadcast full state on every move.
+                // Just send the player's new position.
+                io.to(currentRoomId).emit('playerMoved', { id: socket.id, x: pos.x, y: pos.y });
             }
         }
     });

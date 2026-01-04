@@ -113,6 +113,23 @@ function App() {
       setGameState(newState);
     });
 
+    newSocket.on('playerMoved', (data: { id: string, x: number, y: number }) => {
+      setGameState(prev => {
+        if (!prev.players[data.id]) return prev; // Player not found (race condition?)
+        return {
+          ...prev,
+          players: {
+            ...prev.players,
+            [data.id]: {
+              ...prev.players[data.id],
+              x: data.x,
+              y: data.y
+            }
+          }
+        };
+      });
+    });
+
     newSocket.on('joinSuccess', (data: { roomId: string }) => {
       setRoomId(data.roomId);
       setIsJoined(true);
