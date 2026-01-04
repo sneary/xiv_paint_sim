@@ -28,7 +28,8 @@ export interface Stroke {
     points: Point[];
     width: number;
     isEraser?: boolean;
-    type?: 'freehand' | 'line' | 'circle' | 'donut';
+    type?: 'freehand' | 'line' | 'circle' | 'donut' | 'cone';
+    anticlockwise?: boolean;
 }
 
 export interface TextObject {

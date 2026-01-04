@@ -10,6 +10,7 @@ import LandingPage from './components/LandingPage';
 import PartyList from './components/PartyList';
 import DebuffMenu from './components/DebuffMenu';
 import WaymarkMenu from './components/WaymarkMenu';
+import CollapsibleSection from './components/CollapsibleSection';
 import PageControls from './components/PageControls';
 
 // In production (Single Service), we want to connect to the same origin (relative path)
@@ -58,6 +59,7 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   // UI Visibility (Collapsed by default on mobile)
+  // UI Visibility
   const [showConfig, setShowConfig] = useState(!isMobile);
   const [showTools, setShowTools] = useState(!isMobile);
   const [scale, setScale] = useState(1);
@@ -69,11 +71,9 @@ function App() {
     const handleResize = () => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
-      if (!mobile) {
-        // Force show on desktop if resized larger
-        setShowConfig(true);
-        setShowTools(true);
-      }
+      // Default to shown on desktop, but allow closing
+      if (showConfig === undefined) setShowConfig(true);
+      if (showTools === undefined) setShowTools(true);
 
       // Calculate Scale
       // Base size is 800x600.
@@ -90,6 +90,8 @@ function App() {
     handleResize(); // Init
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+
 
   const handleJoystickMove = (event: any) => {
     if (event) {
@@ -403,8 +405,11 @@ function App() {
 
 
   const [selectedColor, setSelectedColor] = useState<number>(0xff0000);
+  const [secondaryColor, setSecondaryColor] = useState<number>(0x000000);
+  const [customPalette, setCustomPalette] = useState<(number | null)[]>([null, null, null, null, null, null]);
   const [lineWidth, setLineWidth] = useState<number>(3);
-  const [tool, setTool] = useState<'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle'>('brush');
+  const [tool, setTool] = useState<'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone'>('brush');
+  const [showLoadWarning, setShowLoadWarning] = useState<boolean>(false);
 
   // Clear text input when tool changes
   useEffect(() => {
@@ -426,6 +431,11 @@ function App() {
 
   const currentStrokeIdRef = useRef<string | null>(null);
 
+  // Cone Interaction State
+  const [conePreview, setConePreview] = useState<{ x: number, y: number, r: number, startAngle: number, endAngle: number, anticlockwise?: boolean } | null>(null);
+  const conePhaseRef = useRef<number>(0); // 0: Idle, 1: Drag 1 (Radius), 2: Wait, 3: Drag 2 (Arc)
+  const coneStartRef = useRef<{ x: number, y: number, r: number, startAngle: number, lastAngle: number, totalRotation: number } | null>(null);
+
   const startStroke = (x: number, y: number) => {
     // If placing a marker, do that instead of drawing
     if (activeMarker) {
@@ -433,8 +443,6 @@ function App() {
       return;
     }
 
-    // If we have an active text input, commit it first (unless we just clicked it, but the input prevents clicks to canvas propagation usually? 
-    // Actually, Input is DOM, Canvas is below. Clicking Input doesn't trigger startStroke. Clicking canvas does.
     if (textInput) {
       if (textInput.value.trim()) {
         socketRef.current?.emit('addText', {
@@ -447,21 +455,40 @@ function App() {
         });
       }
       setTextInput(null);
-      // If we are in text tool, we want to start a NEW text input at this location
       if (tool === 'text') {
         setTextInput({ x, y, value: '' });
         setIsDrawing(false);
         return;
       }
-      // If we are NOT in text tool (unreachable due to useEffect clearing checking tool? No, maybe useEffect hasn't run yet if we just clicked? 
-      // Actually if tool changed, input is gone. So this is for when we are IN text tool and click elsewhere.
-      // But wait, if I am in Brush mode, `textInput` should be null. 
-      // So this block mainly handles "I am in text mode, I have an open input, and I clicked elsewhere".
     }
 
     if (tool === 'text') {
       setTextInput({ x, y, value: '' });
       setIsDrawing(false);
+      return;
+    }
+
+    if (tool === 'cone') {
+      if (conePhaseRef.current === 0) {
+        // Start Phase 1: Center determined.
+        conePhaseRef.current = 1;
+        coneStartRef.current = { x, y, r: 0, startAngle: 0, lastAngle: 0, totalRotation: 0 };
+        setShapePreview({ x, y, r: 0 }); // Start with 0 radius circle
+        setConePreview(null);
+        setIsDrawing(true);
+      } else if (conePhaseRef.current === 2) {
+        // Start Phase 3: Axis determined. Dragging for spread.
+        conePhaseRef.current = 3;
+        // Initialize winding tracking
+        const start = coneStartRef.current;
+        if (start) {
+          const dx = x - start.x;
+          const dy = y - start.y;
+          const currentAngle = Math.atan2(dy, dx);
+          coneStartRef.current = { ...start, lastAngle: currentAngle, totalRotation: 0 };
+        }
+        setIsDrawing(true);
+      }
       return;
     }
 
@@ -489,7 +516,7 @@ function App() {
         color: selectedColor,
         width: lineWidth,
         isEraser: false,
-        type: tool // 'donut' or 'circle'
+        type: tool
       });
     } else {
       socketRef.current?.emit('startStroke', {
@@ -506,6 +533,51 @@ function App() {
 
   const moveStroke = (x: number, y: number) => {
     if (activeMarker) return;
+
+    if (tool === 'cone') {
+      if (!isDrawing && conePhaseRef.current !== 2) return;
+      const start = coneStartRef.current;
+      if (!start) return;
+
+      if (conePhaseRef.current === 1) {
+        // Drag 1: Update Radius. Angle ignored for preview (Circle).
+        const dx = x - start.x;
+        const dy = y - start.y;
+        const r = Math.hypot(dx, dy);
+        const angle = Math.atan2(dy, dx);
+        coneStartRef.current = { ...start, r, startAngle: angle, lastAngle: angle, totalRotation: 0 };
+        setShapePreview({ x: start.x, y: start.y, r });
+        setConePreview(null);
+      } else if (conePhaseRef.current === 2) {
+        // Hover: Update Main Axis Angle. Preview: Circle + Line.
+        // Radius is fixed from Phase 1.
+        const angle = Math.atan2(y - start.y, x - start.x);
+        coneStartRef.current = { ...start, startAngle: angle, lastAngle: angle, totalRotation: 0 };
+
+        setShapePreview({ x: start.x, y: start.y, r: start.r }); // Keep circle
+        setConePreview({ x: start.x, y: start.y, r: start.r, startAngle: angle, endAngle: angle, anticlockwise: false }); // Show Axis
+      } else if (conePhaseRef.current === 3) {
+        // Drag 2: Update Spread.
+        const dx = x - start.x;
+        const dy = y - start.y;
+        const currentAngle = Math.atan2(dy, dx);
+
+        // Calculate winding
+        let diff = currentAngle - start.lastAngle;
+        // Normalize -PI to PI
+        while (diff > Math.PI) diff -= 2 * Math.PI;
+        while (diff < -Math.PI) diff += 2 * Math.PI;
+
+        const newTotal = start.totalRotation + diff;
+        coneStartRef.current = { ...start, lastAngle: currentAngle, totalRotation: newTotal };
+
+        const anticlockwise = newTotal < 0;
+        setShapePreview({ x: start.x, y: start.y, r: start.r });
+        setConePreview({ x: start.x, y: start.y, r: start.r, startAngle: start.startAngle, endAngle: currentAngle, anticlockwise });
+      }
+      return;
+    }
+
     if (!isDrawing || !currentStrokeIdRef.current) return;
 
     if (tool === 'line') {
@@ -514,8 +586,6 @@ function App() {
     }
 
     if (tool === 'donut' || tool === 'circle') {
-      // Calculate radius
-      // circlePreview has x,y (center).
       setShapePreview(prev => {
         if (!prev) return null;
         const r = Math.sqrt(Math.pow(x - prev.x, 2) + Math.pow(y - prev.y, 2));
@@ -528,14 +598,44 @@ function App() {
   };
 
   const endStroke = () => {
+    if (tool === 'cone') {
+      if (conePhaseRef.current === 1) {
+        // End Phase 1. Go to Phase 2.
+        conePhaseRef.current = 2;
+        setIsDrawing(false);
+        // Don't clear preview, we want the circle to persist in Phase 2 hover
+      } else if (conePhaseRef.current === 3) {
+        // Emit
+        const start = coneStartRef.current;
+        if (start && conePreview) {
+          const id = Math.random().toString(36).substr(2, 9);
+          const anticlockwise = start.totalRotation < 0;
+          socketRef.current?.emit('startStroke', {
+            id, x: start.x, y: start.y, color: selectedColor, width: lineWidth, isEraser: false, type: 'cone', anticlockwise
+          });
+          const p1x = start.x + start.r * Math.cos(start.startAngle);
+          const p1y = start.y + start.r * Math.sin(start.startAngle);
+          socketRef.current?.emit('drawPoint', { id, x: p1x, y: p1y });
+
+          const p2x = start.x + start.r * Math.cos(conePreview.endAngle);
+          const p2y = start.y + start.r * Math.sin(conePreview.endAngle);
+          socketRef.current?.emit('drawPoint', { id, x: p2x, y: p2y });
+          socketRef.current?.emit('endStroke');
+        }
+        conePhaseRef.current = 0;
+        setConePreview(null);
+        setShapePreview(null);
+        setIsDrawing(false);
+      }
+      return;
+    }
+
     if (tool === 'line' && linePreview && currentStrokeIdRef.current) {
-      // Emit the final point to complete the line
       socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x: linePreview.x2, y: linePreview.y2 });
       setLinePreview(null);
     }
 
     if ((tool === 'donut' || tool === 'circle') && shapePreview && currentStrokeIdRef.current) {
-      // We emit the final point which determines the radius (Center is Point 0, Radius Point is Point 1)
       socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x: shapePreview.x + shapePreview.r, y: shapePreview.y });
       setShapePreview(null);
     }
@@ -642,52 +742,7 @@ function App() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#111' }}>
 
-      {/* Room Code Display */}
-      <div style={{
-        position: 'absolute',
-        top: '10px',
-        right: isMobile ? '60px' : '10px', // Shift left on mobile to avoid tools button if needed, or just below
-        background: 'rgba(0, 0, 0, 0.6)',
-        padding: '5px 10px',
-        borderRadius: '4px',
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontFamily: 'monospace',
-        zIndex: 1000,
-        fontSize: '14px',
-        pointerEvents: 'none'
-      }}>
-        Room: <span style={{ color: 'white', fontWeight: 'bold' }}>{roomId}</span>
-      </div>
 
-      {/* Connection Status Indicator */}
-      <div style={{
-        position: 'absolute',
-        top: '40px', // Below Room ID
-        right: isMobile ? '60px' : '10px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '6px',
-        padding: '5px 10px',
-        borderRadius: '4px',
-        background: 'rgba(0,0,0,0.4)',
-        pointerEvents: 'none',
-        zIndex: 1000
-      }}>
-        <div style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: isConnected ? '#4CAF50' : '#f44336',
-          boxShadow: isConnected ? '0 0 5px #4CAF50' : 'none'
-        }} />
-        <span style={{
-          fontSize: '12px',
-          color: isConnected ? 'rgba(255,255,255,0.7)' : '#ff6b6b',
-          fontWeight: isConnected ? 'normal' : 'bold'
-        }}>
-          {isConnected ? 'Connected' : 'Reconnecting...'}
-        </span>
-      </div>
 
       {/* ... (Config Toggle, Menu, Joystick, Tools Toggle, Color Picker) code omitted for brevity in search, focusing on insertion point */}
 
@@ -714,8 +769,8 @@ function App() {
 
       {/* Config Menu */}
       {
-        (showConfig || !isMobile) && (
-          <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 120 }}>
+        showConfig && (
+          <div style={{ position: 'absolute', top: 60, left: 10, zIndex: 120, transform: 'scale(0.9)', transformOrigin: 'top left' }}>
             <div style={{ position: 'relative' }}>
               <ConfigMenu
                 config={currentPage.config}
@@ -740,15 +795,8 @@ function App() {
                     socketRef.current.emit('clearLimitCut');
                   }
                 }}
+                onClose={() => setShowConfig(false)}
               />
-              {isMobile && (
-                <button
-                  onClick={() => setShowConfig(false)}
-                  style={{ position: 'absolute', top: -10, right: -10, background: 'red', color: 'white', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer' }}
-                >
-                  ×
-                </button>
-              )}
             </div>
           </div>
         )
@@ -770,9 +818,9 @@ function App() {
         )
       }
 
-      {/* Tools Toggle (Mobile) */}
+      {/* Tools Toggle (Visible when Tools are hidden) */}
       {
-        isMobile && !showTools && (
+        !showTools && (
           <button
             onClick={() => setShowTools(true)}
             style={{
@@ -785,183 +833,210 @@ function App() {
         )
       }
 
+      {/* Status Indicator (Top Left) */}
+      <div style={{
+        position: 'absolute',
+        top: 10, // Tighter to corner
+        left: 10, // Moved to Left
+        display: 'flex',
+        gap: '12px', // Restored gap
+        alignItems: 'center',
+        zIndex: 110,
+        background: 'rgba(0,0,0,0.8)',
+        padding: '8px 16px', // Restored padding
+        borderRadius: '20px', // Restored radius
+        border: '1px solid #444',
+        boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
+        transform: isMobile ? 'scale(0.75)' : 'none', // Mobile: scaled down from larger base
+        transformOrigin: 'top left'
+      }}>
+        {/* Connected Status */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{
+            width: 8, // Restored dot size
+            height: 8,
+            borderRadius: '50%',
+            background: isConnected ? '#4CAF50' : '#f44336',
+            boxShadow: isConnected ? '0 0 3px #4CAF50' : 'none'
+          }} />
+          <span style={{ color: '#eee', fontSize: '13px', fontFamily: 'sans-serif', fontWeight: 500 }}>
+            {isConnected ? 'Connected' : 'Disconnected'}
+          </span>
+        </div>
+
+        {/* Room Code */}
+        {roomId && (
+          <div style={{
+            display: 'flex', alignItems: 'center', // Ensure vertical alignment
+            color: '#fff',
+            fontSize: '13px', // Restored font size
+            fontFamily: 'sans-serif',
+            borderLeft: '1px solid #666',
+            paddingLeft: '12px', // Restored padding
+            height: '100%', // Full height for alignment
+            letterSpacing: '0.5px'
+          }}>
+            Room: {roomId}
+          </div>
+        )}
+      </div>
+
       {/* Color Picker UI */}
       {
-        (showTools || !isMobile) && (
-          <div style={{ position: 'absolute', top: 20, right: 20, background: 'rgba(30,30,30,0.9)', padding: '15px', borderRadius: '8px', zIndex: 100, display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {isMobile && (
+        showTools && (
+          <div style={{
+            position: 'absolute',
+            top: 10, // Moved to top
+            right: 10, // Symmetrical with left
+            background: isMobile ? 'rgba(20,20,20,0.95)' : 'rgba(30,30,30,0.9)',
+            padding: '15px',
+            borderRadius: '8px',
+            zIndex: 100,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '10px',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            width: '230px'
+          }}>
+            {/* Colors Header with Close Button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>
+              <h3 style={{ margin: 0, color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Colors</h3>
               <button
                 onClick={() => setShowTools(false)}
-                style={{ alignSelf: 'flex-end', background: 'none', border: 'none', color: '#aaa', fontSize: '20px', cursor: 'pointer', padding: 0, margin: '-5px 0 0 0' }}
+                style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '20px', cursor: 'pointer', padding: 0, lineHeight: 1 }}
               >
                 ×
               </button>
-            )}
+            </div>
 
-            {/* Color Grid */}
+            {/* Colors Section (Static) */}
             <div>
-              <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Paint Color</h3>
-              <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', maxWidth: '150px' }}>
-                {[0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0xCC5500].map(color => (
-                  <div
-                    key={color}
-                    onClick={() => {
-                      setTool('brush');
-                      setSelectedColor(color);
-                    }}
-                    style={{
-                      width: '30px',
-                      height: '30px',
-                      backgroundColor: '#' + color.toString(16).padStart(6, '0'),
-                      border: (tool === 'brush' && selectedColor === color) ? '2px solid white' : '1px solid #555',
-                      cursor: 'pointer',
-                      borderRadius: '4px'
-                    }}
-                  />
-                ))}
 
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(6, 30px)',
+                gap: '6px',
+                // justifyContent: 'center' removed for left alignment
+              }}>
+                {(() => {
+                  const PALETTE_COLORS = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0xCC5500];
+                  const renderSwatch = (color: number) => (
+                    <div
+                      key={color}
+                      className={`color-swatch ${tool === 'brush' && selectedColor === color ? 'selected' : ''}`}
+                      onClick={() => { setTool('brush'); setSelectedColor(color); }}
+                      style={{ backgroundColor: '#' + color.toString(16).padStart(6, '0'), width: '100%', height: '100%' }}
+                    />
+                  );
+                  const renderCustomSlot = (index: number) => {
+                    const color = customPalette[index];
+                    const isSelected = tool === 'brush' && selectedColor === color;
+                    return (
+                      <div
+                        key={`custom-${index}`}
+                        className={`custom-slot ${isSelected ? 'selected' : ''}`}
+                        style={color !== null ? { backgroundColor: '#' + color.toString(16).padStart(6, '0') } : {}}
+                      >
+                        <input type="color" value={color !== null ? '#' + color.toString(16).padStart(6, '0') : '#000000'} onChange={(e) => {
+                          const val = parseInt(e.target.value.replace('#', ''), 16);
+                          const newPalette = [...customPalette];
+                          newPalette[index] = val;
+                          setCustomPalette(newPalette);
+                          setSelectedColor(val);
+                          setTool('brush');
+                        }} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0 }} />
+                        {color === null && <span>+</span>}
+                      </div>
+                    );
+                  };
+                  return (
+                    <>
+                      {PALETTE_COLORS.slice(0, 4).map(renderSwatch)}
+                      {renderCustomSlot(0)}
+                      {renderCustomSlot(1)}
+                      {PALETTE_COLORS.slice(4, 8).map(renderSwatch)}
+                      {renderCustomSlot(2)}
+                      {renderCustomSlot(3)}
+                      <div className={`rainbow-button ${tool === 'brush' && !PALETTE_COLORS.includes(selectedColor) && !customPalette.includes(selectedColor) ? 'selected' : ''}`} style={{ position: 'relative', overflow: 'hidden', gridColumn: 'span 2', width: '100%' }}>
+                        <input type="color" value={'#' + selectedColor.toString(16).padStart(6, '0')} onChange={(e) => { setSelectedColor(parseInt(e.target.value.replace('#', ''), 16)); setTool('brush'); }} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0 }} />
+                      </div>
+                      <div className="swap-control" title="Swap Colors" style={{ gridColumn: 'span 2', width: '100%' }} onClick={() => { const old = selectedColor; setSelectedColor(secondaryColor); setSecondaryColor(old); }}>
+                        <div className="swap-secondary" style={{ backgroundColor: '#' + secondaryColor.toString(16).padStart(6, '0') }} />
+                        <div className="swap-primary" style={{ backgroundColor: '#' + selectedColor.toString(16).padStart(6, '0') }} />
+                        <div className="swap-icon">↹</div>
+                      </div>
+                      {renderCustomSlot(4)}
+                      {renderCustomSlot(5)}
+                    </>
+                  );
+                })()}
               </div>
             </div>
 
-            {/* Divider */}
-            <div style={{ height: '1px', background: '#555', margin: '5px 0' }}></div>
-
-            {/* Tools */}
+            {/* Brush Size Section (Static) */}
             <div>
-              <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Tools</h3>
-              <div className="tool-grid">
-                <button
-                  className={`tool-button ${tool === 'eraser' ? 'active' : ''}`}
-                  onClick={() => setTool('eraser')}
-                >
-                  Eraser
-                </button>
-                <button
-                  className={`tool-button ${tool === 'line' ? 'active' : ''}`}
-                  onClick={() => setTool('line')}
-                >
-                  Line
-                </button>
-                <button
-                  className={`tool-button ${tool === 'donut' ? 'active' : ''}`}
-                  onClick={() => setTool('donut')}
-                >
-                  Donut
-                </button>
-                <button
-                  className={`tool-button ${tool === 'circle' ? 'active' : ''}`}
-                  onClick={() => setTool('circle')}
-                >
-                  Circle
-                </button>
-                <button
-                  className={`tool-button ${tool === 'text' ? 'active' : ''}`}
-                  onClick={() => setTool('text')}
-                >
-                  Text
-                </button>
-                <button
-                  className="tool-button warning"
-                  onClick={() => socketRef.current?.emit('undoStroke')}
-                >
-                  Undo
-                </button>
-                <button
-                  className="tool-button danger"
-                  onClick={handleClear}
-                  style={{ gridColumn: 'span 2' }}
-                >
-                  Clear All
-                </button>
-              </div>
-
-              {/* Save/Load */}
-              <div style={{ display: 'flex', gap: '5px' }}>
-                <button
-                  onClick={handleSave}
-                  style={{
-                    padding: '8px',
-                    background: '#4CAF50',
-                    border: '1px solid #388E3C',
-                    borderRadius: '4px',
-                    color: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                  Save
-                </button>
-                <label style={{
-                  padding: '8px',
-                  background: '#2196F3',
-                  border: '1px solid #1976D2',
-                  borderRadius: '4px',
-                  color: 'white',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: 0
-                }}>
-                  Load
-                  <input
-                    type="file"
-                    accept=".json"
-                    onChange={handleLoad}
-                    style={{ display: 'none' }}
-                  />
-                </label>
-              </div>
-            </div>
-
-            {/* Line Width Slider */}
-            <div>
-              <h3 style={{ margin: '10px 0 5px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px' }}>Size: {lineWidth}px</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <input
-                  type="range"
-                  min="1"
-                  max="40"
-                  value={lineWidth}
-                  onChange={(e) => setLineWidth(Number(e.target.value))}
-                  style={{ width: '100px' }}
-                />
-                {/* Size Indicator */}
-                <div style={{
-                  width: '45px',
-                  height: '45px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}>
-                  <div style={{
-                    width: lineWidth + 'px',
-                    height: lineWidth + 'px',
-                    background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'),
-                    borderRadius: '50%',
-                    border: tool === 'eraser' ? '1px solid #999' : 'none'
-                  }} />
+              <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>Brush Size: {lineWidth}px</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', justifyContent: 'center' }}>
+                <input type="range" min="1" max="40" value={lineWidth} onChange={(e) => setLineWidth(Number(e.target.value))} style={{ flex: 1 }} />
+                <div style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#222', borderRadius: '4px', border: '1px solid #555' }}>
+                  <div style={{ width: lineWidth + 'px', height: lineWidth + 'px', background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'), borderRadius: '50%', border: tool === 'eraser' ? '1px solid #999' : 'none' }} />
                 </div>
               </div>
             </div>
 
-            {!isMobile && (
+            {/* Tools Section */}
+            <CollapsibleSection title="Tools" defaultOpen={true}>
+              <div className="tool-grid">
+                <button className={`tool-button ${tool === 'eraser' ? 'active' : ''}`} onClick={() => setTool('eraser')}>Eraser</button>
+                <button className={`tool-button ${tool === 'line' ? 'active' : ''}`} onClick={() => setTool('line')}>Line</button>
+                <button className={`tool-button ${tool === 'donut' ? 'active' : ''}`} onClick={() => setTool('donut')}>Donut</button>
+                <button className={`tool-button ${tool === 'circle' ? 'active' : ''}`} onClick={() => setTool('circle')}>Circle</button>
+                <button className={`tool-button ${tool === 'text' ? 'active' : ''}`} onClick={() => setTool('text')}>Text</button>
+                <button className={`tool-button ${tool === 'cone' ? 'active' : ''}`} onClick={() => setTool('cone')}>Fan/Cone</button>
+                <button className="tool-button warning" onClick={() => socketRef.current?.emit('undoStroke')}>Undo</button>
+                <button className="tool-button danger" onClick={handleClear} style={{ gridColumn: 'span 2' }}>Clear All</button>
+              </div>
+            </CollapsibleSection>
+
+            {/* Waymarks Section (Universal) */}
+            <CollapsibleSection title="Waymarks" defaultOpen={false}>
               <WaymarkMenu
                 activeMarker={activeMarker}
-                onSelect={(m) => {
-                  setActiveMarker(m);
-                  if (m) setTool('brush'); // Ensure brush isn't eraser? Or purely visual.
-                }}
+                onSelect={(m) => { setActiveMarker(m); if (m) setTool('brush'); }}
                 onClearAll={() => socketRef.current?.emit('clearMarkers')}
               />
-            )}
+            </CollapsibleSection>
 
+
+            {/* Save/Load (Separate - Always visible at bottom of panel) */}
+            <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
+              <button onClick={handleSave} style={{ flex: 1, padding: '8px', background: '#4CAF50', border: '1px solid #388E3C', borderRadius: '4px', color: 'white' }}>Save</button>
+              <button onClick={() => setShowLoadWarning(!showLoadWarning)} style={{ flex: 1, padding: '8px', background: '#2196F3', border: '1px solid #1976D2', borderRadius: '4px', color: 'white' }}>Load</button>
+            </div>
+
+            {/* Load Warning Flow */}
+            {showLoadWarning && (
+              <div style={{ marginTop: '10px', padding: '10px', background: '#330000', border: '1px solid #ff4444', borderRadius: '4px' }}>
+                <div style={{ color: '#ff4444', fontSize: '12px', marginBottom: '10px' }}>
+                  Warning: Loading will fully replace all current pages.
+                </div>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                  <label style={{ padding: '5px 10px', background: '#d32f2f', border: '1px solid #b71c1c', borderRadius: '4px', color: 'white', fontSize: '12px', display: 'inline-block' }}>
+                    Confirm Load
+                    <input type="file" accept=".json" onChange={(e) => { handleLoad(e); setShowLoadWarning(false); }} style={{ display: 'none' }} />
+                  </label>
+                  <button onClick={() => setShowLoadWarning(false)} style={{ padding: '5px 10px', background: '#555', border: '1px solid #777', borderRadius: '4px', color: 'white', fontSize: '12px' }}>Cancel</button>
+                </div>
+              </div>
+            )}
 
           </div>
         )
       }
 
 
-      {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>}
+      {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV Paint Sim</h1>}
 
       <div style={{ color: '#aaa', marginBottom: '1rem', fontSize: isMobile ? '0.8rem' : '1rem' }}>
         {myId ? `Connected as ${gameState.players[myId]?.name || myId} (Room: ${roomId})` : 'Connecting...'}
@@ -971,16 +1046,17 @@ function App() {
       {/* Party List Container */}
       <div style={{
         position: 'absolute',
-        top: isMobile ? 50 : 320, // Mobile: Top center. Desktop: Left column (lower to clear Config Menu).
-        left: isMobile ? '50%' : 20,
-        transform: isMobile ? 'translateX(-50%)' : 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        alignItems: isMobile ? 'center' : 'flex-start',
-        zIndex: 150 // Ensure above arena
+        top: isMobile ? '10px' : '320px', // Mobile: Top padding (match indicator). Desktop: Below Config.
+        left: isMobile ? '50%' : '10px', // Mobile: Center. Desktop: Left aligned.
+        transform: isMobile ? 'translateX(-50%) scale(0.9)' : 'none', // Mobile: Centered & 10% smaller
+        transformOrigin: 'top center',
+        zIndex: 50, // Lower layer
+        // pointerEvents: 'none' // Removed to allow interaction if needed, though z-index handles layering
       }}>
-        <PartyList players={gameState.players} myId={myId} />
+        <PartyList
+          players={gameState.players}
+          myId={myId}
+        />
       </div>
 
       {/* Countdown Overlay */}
@@ -1004,13 +1080,13 @@ function App() {
         )
       }
 
-      {/* Config Menu Toggle (Mobile) */}
+      {/* Config Menu Toggle */}
       {
-        isMobile && !showConfig && (
+        !showConfig && (
           <button
             onClick={() => setShowConfig(true)}
             style={{
-              position: 'absolute', top: 20, left: 20, zIndex: 110,
+              position: 'absolute', top: 50, left: 10, zIndex: 110, // Moved down (50px) to clear Status Indicator
               background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
             }}
           >
@@ -1033,6 +1109,7 @@ function App() {
           markers={gameState.pages[gameState.currentPageIndex].markers}
           linePreview={linePreview}
           shapePreview={shapePreview}
+          conePreview={conePreview}
           text={gameState.pages[gameState.currentPageIndex].text}
           currentTool={tool}
           currentColor={selectedColor}
@@ -1085,17 +1162,19 @@ function App() {
         )}
       </div>
 
-      {isJoined && (
-        <PageControls
-          pages={gameState.pages}
-          currentPageIndex={gameState.currentPageIndex}
-          onAddPage={handleAddPage}
-          onDeletePage={handleDeletePage}
-          onChangePage={handleChangePage}
-        />
-      )}
+      {
+        isJoined && (
+          <PageControls
+            pages={gameState.pages}
+            currentPageIndex={gameState.currentPageIndex}
+            onAddPage={handleAddPage}
+            onDeletePage={handleDeletePage}
+            onChangePage={handleChangePage}
+          />
+        )
+      }
 
-    </div>
+    </div >
   );
 }
 

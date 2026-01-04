@@ -7,9 +7,10 @@ interface ConfigMenuProps {
     onClearDebuffs: () => void;
     onLimitCut: () => void;
     onClearLimitCut: () => void;
+    onClose?: () => void;
 }
 
-const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut }: ConfigMenuProps) => {
+const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onClose }: ConfigMenuProps) => {
     return (
         <div style={{
             backgroundColor: 'rgba(30, 30, 30, 0.9)',
@@ -18,9 +19,20 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
             border: '1px solid #444',
             zIndex: 100,
             color: '#eee',
-            fontFamily: 'sans-serif'
+            fontFamily: 'sans-serif',
+            minWidth: '200px'
         }}>
-            <h3 style={{ margin: '0 0 10px' }}>Arena Config</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h3 style={{ margin: 0 }}>Arena Config</h3>
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        style={{ background: 'none', border: 'none', color: '#aaa', fontSize: '20px', cursor: 'pointer', padding: 0, lineHeight: 1 }}
+                    >
+                        ×
+                    </button>
+                )}
+            </div>
 
             <div style={{ marginBottom: '10px' }}>
                 <label style={{ marginRight: '10px' }}>Shape:</label>

@@ -10,17 +10,7 @@ const MARKERS = ['A', 'B', 'C', 'D', '1', '2', '3', '4'];
 
 const WaymarkMenu: React.FC<WaymarkMenuProps> = ({ activeMarker, onSelect, onClearAll }) => {
     return (
-        <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            background: 'rgba(20, 20, 20, 0.9)',
-            padding: '10px',
-            borderRadius: '8px',
-            border: '1px solid #444',
-            marginTop: '10px'
-        }}>
-            <div style={{ fontSize: '12px', color: '#aaa', textAlign: 'center' }}>Waymarks</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                 {MARKERS.map(m => {

@@ -16,8 +16,9 @@ interface ArenaProps {
     // Preview for current line tool
     linePreview?: { x1: number, y1: number, x2: number, y2: number } | null;
     shapePreview?: { x: number, y: number, r: number } | null;
+    conePreview?: { x: number, y: number, r: number, startAngle: number, endAngle: number, anticlockwise?: boolean } | null;
     text?: { id: string, x: number, y: number, text: string, color: number, fontSize: number }[];
-    currentTool?: 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle';
+    currentTool?: 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone';
     currentColor?: number;
     currentWidth?: number;
 }
@@ -35,6 +36,7 @@ const Arena = ({
     markers = {},
     linePreview,
     shapePreview,
+    conePreview,
     text = [],
     currentTool = 'brush',
     currentColor = 0xff0000,
@@ -113,7 +115,23 @@ const Arena = ({
                                     join: PIXI.LINE_JOIN.ROUND
                                 });
 
-                                if ((stroke.type === 'donut' || stroke.type === 'circle') && stroke.points.length >= 2) {
+                                if (stroke.type === 'cone' && stroke.points.length >= 3) {
+                                    const center = stroke.points[0];
+                                    const pStart = stroke.points[1];
+                                    const pEnd = stroke.points[2];
+                                    const r = Math.sqrt(Math.pow(pStart.x - center.x, 2) + Math.pow(pStart.y - center.y, 2));
+                                    const startAngle = Math.atan2(pStart.y - center.y, pStart.x - center.x);
+                                    let endAngle = Math.atan2(pEnd.y - center.y, pEnd.x - center.x);
+
+                                    // Use explicit anticlockwise flag from stroke data
+                                    const anticlockwise = stroke.anticlockwise ?? false;
+
+                                    g.beginFill(finalColor, 0.5);
+                                    g.moveTo(center.x, center.y);
+                                    g.arc(center.x, center.y, r, startAngle, endAngle, anticlockwise);
+                                    g.lineTo(center.x, center.y);
+                                    g.endFill();
+                                } else if ((stroke.type === 'donut' || stroke.type === 'circle') && stroke.points.length >= 2) {
                                     const center = stroke.points[0];
                                     const radiusPoint = stroke.points[stroke.points.length - 1];
                                     const r = Math.sqrt(Math.pow(radiusPoint.x - center.x, 2) + Math.pow(radiusPoint.y - center.y, 2));
@@ -160,11 +178,30 @@ const Arena = ({
                             if (shapePreview) {
                                 g.lineStyle(2, 0xFFFFFF, 0.8);
                                 if (currentTool === 'circle') {
-                                    g.beginFill(currentColor || 0xff0000, 1.0);
+                                    g.beginFill(currentColor ?? 0xff0000, 1.0);
                                 } else {
                                     g.beginFill(0, 0);
                                 }
                                 g.drawCircle(shapePreview.x, shapePreview.y, shapePreview.r);
+                                g.endFill();
+                            }
+
+                            // Cone Preview
+                            if (conePreview) {
+                                g.lineStyle(2, 0xFFFFFF, 0.8);
+                                g.beginFill(currentColor ?? 0xff0000, 0.5);
+                                g.moveTo(conePreview.x, conePreview.y);
+
+                                // Highlighting the axis: if angles are same, draw line
+                                if (Math.abs(conePreview.startAngle - conePreview.endAngle) < 0.001) {
+                                    g.lineTo(
+                                        conePreview.x + conePreview.r * Math.cos(conePreview.startAngle),
+                                        conePreview.y + conePreview.r * Math.sin(conePreview.startAngle)
+                                    );
+                                } else {
+                                    g.arc(conePreview.x, conePreview.y, conePreview.r, conePreview.startAngle, conePreview.endAngle, conePreview.anticlockwise ?? false);
+                                    g.lineTo(conePreview.x, conePreview.y);
+                                }
                                 g.endFill();
                             }
 
@@ -280,7 +317,7 @@ const Arena = ({
                     draw={useCallback((g: PIXI.Graphics) => {
                         g.clear();
                         if (currentTool === 'text') {
-                            const color = currentColor || 0xff0000;
+                            const color = currentColor ?? 0xff0000;
                             g.lineStyle(2, color, 1);
                             // Calculate anticipated font size to match App.tsx logic
                             const fontSize = Math.max(12, currentWidth * 2);
@@ -298,7 +335,7 @@ const Arena = ({
                             return;
                         }
                         const isEraser = currentTool === 'eraser';
-                        const color = isEraser ? 0xffffff : (currentColor || 0xff0000);
+                        const color = isEraser ? 0xffffff : (currentColor ?? 0xff0000);
                         const alpha = isEraser ? 0.5 : 0.8;
 
                         let r = Math.max((currentWidth || 3) / 2, 2);
