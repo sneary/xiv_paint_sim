@@ -1,10 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './LandingPage.css';
 
 interface LandingPageProps {
-    onJoin: (name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator') => void;
-    takenNames: string[];
-    takenColors: number[];
+    onJoin: (data: { action: 'create' | 'join', roomId?: string, name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => void;
 }
 
 const COLORS = [
@@ -12,42 +10,51 @@ const COLORS = [
     0xff00ff, 0x00ffff, 0xffffff, 0xCC5500
 ];
 
-const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
+const LandingPage = ({ onJoin }: LandingPageProps) => {
 
+    const [mode, setMode] = useState<'create' | 'join'>('create');
+    const [roomId, setRoomId] = useState('');
     const [name, setName] = useState('');
     const [selectedColor, setSelectedColor] = useState(COLORS[0]);
     const [selectedRole, setSelectedRole] = useState<'tank' | 'healer' | 'dps' | 'spectator'>('dps');
     const [error, setError] = useState('');
 
-    const isNameTaken = (n: string) => takenNames.some(taken => taken.toLowerCase() === n.toLowerCase());
-    const isColorTaken = (c: number) => takenColors.includes(c);
     const isSpectator = selectedRole === 'spectator';
 
-    // Auto-select next available color if current is taken
-    useEffect(() => {
-        if (!isSpectator && isColorTaken(selectedColor)) {
-            const nextColor = COLORS.find(c => !takenColors.includes(c));
-            if (nextColor !== undefined) {
-                setSelectedColor(nextColor);
-            }
-        }
-    }, [takenColors, selectedColor, isSpectator]);
+    // Auto-select logic removed as we don't have takenColors yet
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
         if (!name.trim()) return;
-        if (isNameTaken(name)) {
-            setError('Name is already taken.');
-            return;
-        }
-        if (!isSpectator && isColorTaken(selectedColor)) {
-            setError('Color is already taken.');
+
+        // BasicClient-side validation (Server does authoritative check)
+        if (mode === 'join' && !roomId.trim()) {
+            setError('Please enter a Room Code.');
             return;
         }
 
-        onJoin(name, selectedColor, selectedRole);
+        if (mode === 'join' && roomId.length !== 4) {
+            setError('Room Code must be 4 characters.');
+            return;
+        }
+
+        // Note: We can't strictly check isNameTaken/isColorTaken here for 'join' 
+        // because existing players list might be from a different room context 
+        // (or global logic if not yet updated). 
+        // Ideally, LandingPage shouldn't show takenNames/Colors until connected to a room?
+        // Actually, with the new architecture, we don't know who is in the target room until we try to join.
+        // So we will rely on server 'joinError' response instead of pre-emptive check for 'join' mode.
+        // For 'create', it's a new room so it's always empty.
+
+        onJoin({
+            action: mode,
+            roomId: mode === 'join' ? roomId : undefined,
+            name: name,
+            color: selectedColor,
+            role: selectedRole
+        });
     };
 
     return (
@@ -59,7 +66,57 @@ const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
                 </div>
 
                 <div className="glass-card">
+                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '20px', gap: '10px' }}>
+                        <button
+                            onClick={() => setMode('create')}
+                            style={{
+                                background: mode === 'create' ? '#e67e22' : 'transparent',
+                                border: '1px solid #e67e22',
+                                color: 'white',
+                                padding: '8px 16px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Host New Room
+                        </button>
+                        <button
+                            onClick={() => setMode('join')}
+                            style={{
+                                background: mode === 'join' ? '#4a90e2' : 'transparent',
+                                border: '1px solid #4a90e2',
+                                color: 'white',
+                                padding: '8px 16px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontWeight: 'bold'
+                            }}
+                        >
+                            Join Room
+                        </button>
+                    </div>
+
                     <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+
+                        {mode === 'join' && (
+                            <div className="form-group">
+                                <label className="form-label">Room Code</label>
+                                <input
+                                    className="input-field"
+                                    type="text"
+                                    value={roomId}
+                                    onChange={(e) => {
+                                        setRoomId(e.target.value.toUpperCase());
+                                        setError('');
+                                    }}
+                                    placeholder="ABCD"
+                                    maxLength={4}
+                                    style={{ textAlign: 'center', letterSpacing: '4px', fontFamily: 'monospace' }}
+                                />
+                            </div>
+                        )}
+
                         <div className="form-group">
                             <label className="form-label">Character Name</label>
                             <input
@@ -73,9 +130,7 @@ const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
                                 placeholder="Enter Name"
                                 maxLength={12}
                                 autoFocus
-                                style={{ borderColor: isNameTaken(name) ? '#ff4444' : '' }}
                             />
-                            {isNameTaken(name) && <div style={{ color: '#ff4444', fontSize: '0.8rem', marginTop: '4px' }}>Name taken</div>}
                         </div>
 
                         <div className="form-group">
@@ -111,12 +166,11 @@ const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
                                 <label className="form-label">Ring & Paint Color</label>
                                 <div className="color-grid">
                                     {COLORS.map(color => {
-                                        const taken = isColorTaken(color);
                                         return (
                                             <div
                                                 key={color}
-                                                onClick={() => !taken && setSelectedColor(color)}
-                                                className={`color-option ${selectedColor === color ? 'selected' : ''} ${taken ? 'disabled' : ''}`}
+                                                onClick={() => setSelectedColor(color)}
+                                                className={`color-option ${selectedColor === color ? 'selected' : ''}`}
                                                 style={{
                                                     backgroundColor: '#' + color.toString(16).padStart(6, '0'),
                                                     color: '#' + color.toString(16).padStart(6, '0'),
@@ -133,9 +187,9 @@ const LandingPage = ({ onJoin, takenNames, takenColors }: LandingPageProps) => {
                         <button
                             className="join-button"
                             type="submit"
-                            disabled={!name.trim() || isNameTaken(name) || (!isSpectator && isColorTaken(selectedColor))}
+                            disabled={!name.trim() || (mode === 'join' && roomId.length !== 4)}
                         >
-                            {isSpectator ? 'Watch Game' : 'Enter Duty'}
+                            {isSpectator ? 'Watch Game' : (mode === 'create' ? 'Create Room' : 'Join Room')}
                         </button>
                     </form>
                 </div>

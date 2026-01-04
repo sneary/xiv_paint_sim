@@ -10,6 +10,7 @@ import LandingPage from './components/LandingPage';
 import PartyList from './components/PartyList';
 import DebuffMenu from './components/DebuffMenu';
 import WaymarkMenu from './components/WaymarkMenu';
+import PageControls from './components/PageControls';
 
 // In production (Single Service), we want to connect to the same origin (relative path)
 // If VITE_SOCKET_URL is set (e.g. for split hosting), use that.
@@ -19,15 +20,20 @@ const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? un
 function App() {
   const [gameState, setGameState] = useState<GameState>({
     players: {},
-    config: { shape: 'circle', width: 500, height: 500 },
-    strokes: [],
-    markers: {},
-    text: []
+    currentPageIndex: 0,
+    pages: [{
+      id: 'init',
+      config: { shape: 'circle', width: 500, height: 500 },
+      strokes: [],
+      markers: {},
+      text: []
+    }]
   });
   const socketRef = useRef<Socket | null>(null);
-  const myIdRef = useRef<string | null>(null);
-
-  const [hasJoined, setHasJoined] = useState(false);
+  const [isJoined, setIsJoined] = useState(false);
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState('');
+  const [countdown, setCountdown] = useState<string | null>(null);
 
   // Movement state
   const keysPressed = useRef<Record<string, boolean>>({});
@@ -41,6 +47,9 @@ function App() {
   const [showConfig, setShowConfig] = useState(!isMobile);
   const [showTools, setShowTools] = useState(!isMobile);
   const [scale, setScale] = useState(1);
+
+  // Helper to safely get current page
+  const currentPage = gameState.pages[gameState.currentPageIndex] || gameState.pages[0];
 
   useEffect(() => {
     const handleResize = () => {
@@ -88,40 +97,38 @@ function App() {
 
   // Socket Events
   useEffect(() => {
-    const socket = io(SOCKET_URL);
-    socketRef.current = socket;
+    // If we have a socket already, don't recreate unless URL changed (it won't)
+    // Actually, simple way: Just create one socket.
+    const newSocket = io(SOCKET_URL, {
+      transports: ['websocket'],
+      upgrade: false
+    });
+    socketRef.current = newSocket;
 
-    socket.on('connect', () => {
-      console.log('Connected to server with ID:', socket.id);
-      myIdRef.current = socket.id || null;
+    newSocket.on('connect', () => {
+      console.log('Connected to server');
     });
 
-    socket.on('stateUpdate', (newState: GameState) => {
-      setGameState(prevState => {
-        const myId = socketRef.current?.id;
-        if (myId && prevState.players[myId] && newState.players[myId]) {
-          return {
-            ...newState,
-            players: {
-              ...newState.players,
-              [myId]: {
-                ...newState.players[myId],
-                x: prevState.players[myId].x,
-                y: prevState.players[myId].y
-              }
-            }
-          };
-        }
-        return newState;
-      });
+    newSocket.on('stateUpdate', (newState: GameState) => {
+      setGameState(newState);
     });
 
-    socket.on('joinError', (msg: string) => {
-      alert(msg);
-      setHasJoined(false);
+    newSocket.on('joinSuccess', (data: { roomId: string }) => {
+      setRoomId(data.roomId);
+      setIsJoined(true);
+      setJoinError('');
     });
 
-    socket.on('honk', (id: string) => {
+    newSocket.on('joinError', (msg: string) => {
+      setJoinError(msg);
+      setIsJoined(false);
+    });
+
+    newSocket.on('countdown', (val: string | null) => {
+      setCountdown(val);
+    });
+
+    newSocket.on('honk', (id: string) => {
       // Trigger visual effect
       setHonkingPlayers(prev => ({ ...prev, [id]: Date.now() }));
       // Clear effect after 200ms
@@ -135,9 +142,27 @@ function App() {
     });
 
     return () => {
-      socket.disconnect();
+      newSocket.disconnect();
     };
   }, []);
+
+  const handleJoin = (data: { action: 'create' | 'join', roomId?: string, name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => {
+    if (socketRef.current) {
+      socketRef.current.emit('joinGame', data);
+    }
+  };
+
+  const handleAddPage = () => {
+    socketRef.current?.emit('addPage');
+  };
+
+  const handleDeletePage = () => {
+    socketRef.current?.emit('deletePage');
+  };
+
+  const handleChangePage = (index: number) => {
+    socketRef.current?.emit('changePage', index);
+  };
 
 
   // Input handling setup
@@ -355,13 +380,7 @@ function App() {
     socketRef.current?.emit('endStroke');
   };
 
-  const handleJoin = (name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator') => {
-    if (socketRef.current) {
-      socketRef.current.emit('joinGame', { name, color, role });
-      setSelectedColor(color);
-      setHasJoined(true);
-    }
-  };
+  // Join handler is defined above (line 147)
 
   const handleClear = () => {
     console.log('Clear button clicked');
@@ -376,10 +395,8 @@ function App() {
 
   const handleSave = () => {
     const saveData = {
-      config: gameState.config,
-      strokes: gameState.strokes,
-      markers: gameState.markers,
-      text: gameState.text
+      pages: gameState.pages,
+      currentPageIndex: gameState.currentPageIndex
     };
     const blob = new Blob([JSON.stringify(saveData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -414,33 +431,54 @@ function App() {
 
   // Debuff Menu State
   const [showDebuffMenu, setShowDebuffMenu] = useState(false);
-  const [countdown, setCountdown] = useState<string | null>(null);
+  // Remove duplicate countdown state here
 
   useEffect(() => {
-    if (!socketRef.current) return;
+    // ... cleanup?
+  }, []);
 
-    socketRef.current.on('countdown', (text: string | null) => {
-      setCountdown(text);
-    });
-
-    return () => {
-      socketRef.current?.off('countdown');
-    };
-  }, [socketRef.current]);
-
-  if (!hasJoined) {
-    // ... no change to this logic, just ensuring context
-    const playersList = Object.values(gameState.players);
-    const takenNames = playersList.map(p => p.name);
-    const takenColors = playersList
-      .filter(p => p.role !== 'spectator')
-      .map(p => p.color);
-
-    return <LandingPage onJoin={handleJoin} takenNames={takenNames} takenColors={takenColors} />;
+  if (!isJoined) {
+    return (
+      <div className="app-container">
+        <LandingPage onJoin={handleJoin} />
+        {joinError && (
+          <div style={{
+            position: 'absolute',
+            bottom: '20px',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(255, 0, 0, 0.8)',
+            padding: '10px 20px',
+            borderRadius: '4px',
+            color: 'white',
+            fontWeight: 'bold'
+          }}>
+            {joinError}
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', backgroundColor: '#111' }}>
+
+      {/* Room Code Display */}
+      <div style={{
+        position: 'absolute',
+        top: '10px',
+        right: isMobile ? '60px' : '10px', // Shift left on mobile to avoid tools button if needed, or just below
+        background: 'rgba(0, 0, 0, 0.6)',
+        padding: '5px 10px',
+        borderRadius: '4px',
+        color: 'rgba(255, 255, 255, 0.7)',
+        fontFamily: 'monospace',
+        zIndex: 1000,
+        fontSize: '14px',
+        pointerEvents: 'none'
+      }}>
+        Room: <span style={{ color: 'white', fontWeight: 'bold' }}>{roomId}</span>
+      </div>
 
       {/* ... (Config Toggle, Menu, Joystick, Tools Toggle, Color Picker) code omitted for brevity in search, focusing on insertion point */}
 
@@ -466,73 +504,12 @@ function App() {
       )}
 
       {/* Config Menu */}
-
-
-      {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>}
-
-      <div style={{ color: '#aaa', marginBottom: '1rem', fontSize: isMobile ? '0.8rem' : '1rem' }}>
-        {myId ? `Connected as ${gameState.players[myId]?.name || myId}` : 'Connecting...'}
-        {!isMobile && <><br />Use W/A/S/D to move. Press Space to Honk. Click and drag in arena to paint.</>}
-      </div>
-
-      {/* Party List Container */}
-      <div style={{
-        position: 'absolute',
-        top: isMobile ? 50 : 320, // Mobile: Top center. Desktop: Left column (lower to clear Config Menu).
-        left: isMobile ? '50%' : 20,
-        transform: isMobile ? 'translateX(-50%)' : 'none',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '10px',
-        alignItems: isMobile ? 'center' : 'flex-start',
-        zIndex: 150 // Ensure above arena
-      }}>
-        <PartyList players={gameState.players} myId={myId} />
-      </div>
-
-      {/* Countdown Overlay */}
-      {
-        countdown && (
-          <div style={{
-            position: 'absolute',
-            top: '30%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            fontSize: '8rem',
-            fontWeight: 'bold',
-            color: '#FFD700', // Gold
-            textShadow: '0 0 20px #000, 2px 2px 0px #000',
-            fontFamily: "'Outfit', sans-serif",
-            pointerEvents: 'none',
-            zIndex: 1000
-          }}>
-            {countdown}
-          </div>
-        )
-      }
-
-      {/* Config Menu Toggle (Mobile) */}
-      {
-        isMobile && !showConfig && (
-          <button
-            onClick={() => setShowConfig(true)}
-            style={{
-              position: 'absolute', top: 20, left: 20, zIndex: 110,
-              background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
-            }}
-          >
-            ⚙️
-          </button>
-        )
-      }
-
-      {/* Config Menu */}
       {
         (showConfig || !isMobile) && (
           <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 120 }}>
             <div style={{ position: 'relative' }}>
               <ConfigMenu
-                config={gameState.config}
+                config={currentPage.config}
                 onUpdate={handleConfigUpdate}
                 onSetDebuffs={() => setShowDebuffMenu(true)}
                 onClearDebuffs={() => {
@@ -803,21 +780,78 @@ function App() {
       }
 
 
+      {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>FFXIV MSPaint Sim</h1>}
+
+      <div style={{ color: '#aaa', marginBottom: '1rem', fontSize: isMobile ? '0.8rem' : '1rem' }}>
+        {myId ? `Connected as ${gameState.players[myId]?.name || myId} (Room: ${roomId})` : 'Connecting...'}
+        {!isMobile && <><br />Use W/A/S/D to move. Press Space to Honk. Click and drag in arena to paint.</>}
+      </div>
+
+      {/* Party List Container */}
+      <div style={{
+        position: 'absolute',
+        top: isMobile ? 50 : 320, // Mobile: Top center. Desktop: Left column (lower to clear Config Menu).
+        left: isMobile ? '50%' : 20,
+        transform: isMobile ? 'translateX(-50%)' : 'none',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '10px',
+        alignItems: isMobile ? 'center' : 'flex-start',
+        zIndex: 150 // Ensure above arena
+      }}>
+        <PartyList players={gameState.players} myId={myId} />
+      </div>
+
+      {/* Countdown Overlay */}
+      {
+        countdown && (
+          <div style={{
+            position: 'absolute',
+            top: '30%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            fontSize: '8rem',
+            fontWeight: 'bold',
+            color: '#FFD700', // Gold
+            textShadow: '0 0 20px #000, 2px 2px 0px #000',
+            fontFamily: "'Outfit', sans-serif",
+            pointerEvents: 'none',
+            zIndex: 1000
+          }}>
+            {countdown}
+          </div>
+        )
+      }
+
+      {/* Config Menu Toggle (Mobile) */}
+      {
+        isMobile && !showConfig && (
+          <button
+            onClick={() => setShowConfig(true)}
+            style={{
+              position: 'absolute', top: 20, left: 20, zIndex: 110,
+              background: '#333', border: '1px solid #555', color: '#fff', borderRadius: '4px', padding: '10px'
+            }}
+          >
+            ⚙️
+          </button>
+        )
+      }
 
       <div style={{ position: 'relative', width: 800 * scale, height: 600 * scale }}>
         <Arena
           players={gameState.players}
           myId={myId}
-          config={gameState.config}
-          strokes={gameState.strokes}
+          config={currentPage.config}
+          strokes={currentPage.strokes}
           onStrokeStart={startStroke}
           onStrokeMove={moveStroke}
           onStrokeEnd={endStroke}
           scale={scale}
           honkingPlayers={honkingPlayers}
-          markers={gameState.markers}
+          markers={currentPage.markers}
           linePreview={linePreview}
-          text={gameState.text}
+          text={currentPage.text}
           currentTool={tool}
           currentColor={selectedColor}
           currentWidth={lineWidth}
@@ -864,6 +898,17 @@ function App() {
           />
         )}
       </div>
+
+      {isJoined && (
+        <PageControls
+          pages={gameState.pages}
+          currentPageIndex={gameState.currentPageIndex}
+          onAddPage={handleAddPage}
+          onDeletePage={handleDeletePage}
+          onChangePage={handleChangePage}
+        />
+      )}
+
     </div>
   );
 }

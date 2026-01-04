@@ -6,7 +6,7 @@ export interface Player {
     name: string;
     role: 'tank' | 'healer' | 'dps' | 'spectator';
     debuffs: number[];
-    limitCut?: number; // 1-8, for Limit Cut mechanic
+    limitCut?: number;
 }
 
 export interface ArenaConfig {
@@ -39,23 +39,35 @@ export interface TextObject {
     fontSize: number;
 }
 
-export interface GameState {
-    players: Record<string, Player>;
+export interface Page {
+    id: string;
     config: ArenaConfig;
     strokes: Stroke[];
     markers: Record<string, Point>;
     text: TextObject[];
 }
 
+export interface GameState {
+    players: Record<string, Player>;
+    currentPageIndex: number;
+    pages: Page[];
+}
+
 export const initialState: GameState = {
     players: {},
-    config: {
-        shape: 'circle',
-        width: 500,
-        height: 500,
-        showGrid: false
-    },
-    strokes: [],
-    markers: {},
-    text: []
+    currentPageIndex: 0,
+    pages: [
+        {
+            id: 'page-1',
+            config: {
+                shape: 'circle',
+                width: 500,
+                height: 500,
+                showGrid: false
+            },
+            strokes: [],
+            markers: {},
+            text: []
+        }
+    ]
 };

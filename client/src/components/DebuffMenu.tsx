@@ -69,7 +69,7 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
             maxWidth: '90vw',
             boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
         }}>
-            <h2 style={{ marginTop: 0, marginBottom: '20px', textAlign: 'center' }}>Set Debuffs & Limit Cuts</h2>
+            <h2 style={{ marginTop: 0, marginBottom: '20px', textAlign: 'center' }}>Set Debuffs & Limit Cut</h2>
 
             <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                 {Object.values(players).map(player => (
