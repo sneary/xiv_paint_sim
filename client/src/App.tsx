@@ -988,6 +988,7 @@ function App() {
             {/* Tools Section */}
             <CollapsibleSection title="Tools" defaultOpen={true}>
               <div className="tool-grid">
+                <button className={`tool-button ${tool === 'brush' ? 'active' : ''}`} onClick={() => setTool('brush')}>Brush</button>
                 <button className={`tool-button ${tool === 'eraser' ? 'active' : ''}`} onClick={() => setTool('eraser')}>Eraser</button>
                 <button className={`tool-button ${tool === 'line' ? 'active' : ''}`} onClick={() => setTool('line')}>Line</button>
                 <button className={`tool-button ${tool === 'donut' ? 'active' : ''}`} onClick={() => setTool('donut')}>Donut</button>
