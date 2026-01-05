@@ -1169,7 +1169,7 @@ function App() {
                 isOpen={isToolsOpen}
                 onToggle={() => setIsToolsOpen(!isToolsOpen)}
               >
-                <div className="tool-grid" style={isMobile ? { maxWidth: '216px' } : {}}>
+                <div className="tool-grid" style={isMobile ? { maxWidth: '210px', margin: 0 } : {}}>
                   {['brush', 'eraser', 'line', 'donut', 'circle', 'text', 'cone'].map(t => (
                     <button
                       key={t}
@@ -1215,7 +1215,7 @@ function App() {
                 isOpen={isWaymarksOpen}
                 onToggle={() => setIsWaymarksOpen(!isWaymarksOpen)}
               >
-                <div style={isMobile ? { maxWidth: '216px' } : {}}>
+                <div style={isMobile ? { maxWidth: '210px', margin: 0 } : {}}>
                   <WaymarkMenu
                     activeMarker={activeMarker}
                     onSelect={(m) => {
