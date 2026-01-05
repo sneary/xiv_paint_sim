@@ -38,11 +38,12 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                 <label style={{ marginRight: '10px' }}>Shape:</label>
                 <select
                     value={config.shape}
-                    onChange={(e) => onUpdate({ shape: e.target.value as 'circle' | 'square' })}
+                    onChange={(e) => onUpdate({ shape: e.target.value as 'circle' | 'square' | 'none' })}
                     style={{ padding: '4px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555' }}
                 >
                     <option value="circle">Circle</option>
                     <option value="square">Square</option>
+                    <option value="none">None</option>
                 </select>
             </div>
 

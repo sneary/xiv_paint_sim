@@ -34,7 +34,7 @@ export interface TextObject {
 }
 
 export interface ArenaConfig {
-    shape: 'circle' | 'square';
+    shape: 'circle' | 'square' | 'none';
     width: number;
     height: number;
     showGrid?: boolean;

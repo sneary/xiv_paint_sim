@@ -10,7 +10,7 @@ export interface Player {
 }
 
 export interface ArenaConfig {
-    shape: 'circle' | 'square';
+    shape: 'circle' | 'square' | 'none';
     width: number;
     height: number;
     showGrid?: boolean;

@@ -245,21 +245,32 @@ const Arena = ({
 
                         if (config.shape === 'circle') {
                             g.drawCircle(400, 300, config.width / 2);
-                        } else {
+                        } else if (config.shape === 'square') {
                             // Square (centered)
                             const halfW = config.width / 2;
                             const halfH = config.height / 2;
                             g.drawRect(400 - halfW, 300 - halfH, config.width, config.height);
                         }
-                        // g.endFill(); // Removed
+                        // If 'none', draw nothing for the boundary
 
                         // Draw Grid
                         if (config.showGrid) {
                             g.lineStyle(1, 0xFFFFFF, 0.1); // Very faint white
                             const step = 50;
-                            const r = config.width / 2;
 
-                            if (config.shape === 'square') {
+                            if (config.shape === 'none') {
+                                // Full Canvas Grid
+                                // Vertical lines (covering 0 to 800)
+                                for (let x = 0; x <= 800; x += step) {
+                                    g.moveTo(x, 0);
+                                    g.lineTo(x, 600);
+                                }
+                                // Horizontal lines (covering 0 to 600)
+                                for (let y = 0; y <= 600; y += step) {
+                                    g.moveTo(0, y);
+                                    g.lineTo(800, y);
+                                }
+                            } else if (config.shape === 'square') {
                                 const halfW = config.width / 2;
                                 const halfH = config.height / 2;
 
@@ -275,6 +286,7 @@ const Arena = ({
                                 }
                             } else {
                                 // Circle
+                                const r = config.width / 2;
                                 // Verticals
                                 for (let x = -r + step; x < r; x += step) {
                                     const limit = Math.sqrt(r * r - x * x);
