@@ -64,7 +64,7 @@ function App() {
   const [showTools, setShowTools] = useState(!isMobile);
 
   // Sub-menu states (Default: Tools open, Waymarks closed)
-  const [isToolsOpen, setIsToolsOpen] = useState(true);
+  const [isToolsOpen, setIsToolsOpen] = useState(!isMobile);
   const [isWaymarksOpen, setIsWaymarksOpen] = useState(false);
 
   const [scale, setScale] = useState(1);
