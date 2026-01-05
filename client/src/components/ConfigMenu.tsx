@@ -152,9 +152,9 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                     onClick={() => onCountdown && onCountdown()}
                     style={{
                         gridColumn: 'span 2',
-                        background: 'rgba(255, 215, 0, 0.1)',
-                        border: '1px solid #FFD700',
-                        color: '#FFD700',
+                        background: '#f0ad4e',
+                        border: '1px solid #eea236',
+                        color: 'white',
                         padding: '5px 10px',
                         borderRadius: '4px',
                         cursor: 'pointer',
@@ -165,7 +165,7 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                         fontWeight: 'bold'
                     }}
                 >
-                    Countdown (3s)
+                    Countdown
                 </button>
             </div>
         </div >
