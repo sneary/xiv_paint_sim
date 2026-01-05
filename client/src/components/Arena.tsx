@@ -17,8 +17,9 @@ interface ArenaProps {
     linePreview?: { x1: number, y1: number, x2: number, y2: number } | null;
     shapePreview?: { x: number, y: number, r: number } | null;
     conePreview?: { x: number, y: number, r: number, startAngle: number, endAngle: number, anticlockwise?: boolean } | null;
+    rectPreview?: { x: number, y: number, w: number, h: number } | null;
     text?: { id: string, x: number, y: number, text: string, color: number, fontSize: number }[];
-    currentTool?: 'select' | 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone';
+    currentTool?: 'select' | 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone' | 'rect';
     currentColor?: number;
     currentWidth?: number;
     // Selection
@@ -40,6 +41,7 @@ const Arena = ({
     linePreview,
     shapePreview,
     conePreview,
+    rectPreview,
     text = [],
     currentTool = 'brush',
     currentColor = 0xff0000,
@@ -156,6 +158,20 @@ const Arena = ({
                                     }
                                     g.drawCircle(center.x, center.y, r);
                                     g.endFill();
+                                } else if (stroke.type === 'rect') {
+                                    // Rectangle
+                                    if (stroke.points.length >= 2) {
+                                        const p1 = stroke.points[0];
+                                        const p2 = stroke.points[stroke.points.length - 1]; // Use last point
+                                        g.lineStyle(0);
+                                        g.beginFill(finalColor, 1.0); // Filled per request
+                                        const x = Math.min(p1.x, p2.x);
+                                        const y = Math.min(p1.y, p2.y);
+                                        const w = Math.abs(p2.x - p1.x);
+                                        const h = Math.abs(p2.y - p1.y);
+                                        g.drawRect(x, y, w, h);
+                                        g.endFill();
+                                    }
                                 } else {
                                     // Handle Freehand / Line (Legacy)
                                     if (stroke.points.length === 1) {
@@ -179,7 +195,21 @@ const Arena = ({
                                 g.lineTo(linePreview.x2, linePreview.y2);
                             }
 
-                            // Shape Preview
+                            // Rect Preview
+                            if (rectPreview) {
+                                g.lineStyle(2, 0xFFFFFF, 0.8);
+                                g.beginFill(currentColor ?? 0xff0000, 1.0);
+                                // Normalizing not strictly needed if drawRect handles negative, but safe
+                                const { x, y, w, h } = rectPreview;
+                                const x_ = w < 0 ? x + w : x;
+                                const y_ = h < 0 ? y + h : y;
+                                const w_ = Math.abs(w);
+                                const h_ = Math.abs(h);
+                                g.drawRect(x_, y_, w_, h_);
+                                g.endFill();
+                            }
+
+                            // Shape Preview (Circle/Donut)
                             if (shapePreview) {
                                 g.lineStyle(2, 0xFFFFFF, 0.8);
                                 if (currentTool === 'circle') {
@@ -213,7 +243,7 @@ const Arena = ({
                         } catch (err) {
                             console.error('Error drawing strokes:', err);
                         }
-                    }, [strokes, linePreview, shapePreview, currentTool, currentColor])}
+                    }, [strokes, linePreview, shapePreview, conePreview, rectPreview, currentTool, currentColor])}
                 />
 
 
@@ -377,8 +407,16 @@ const Arena = ({
                             const { x, y, w, h } = selectionBox;
                             g.lineStyle(1, 0x00B4FF, 0.8); // Light Blue
                             g.drawRect(x, y, w, h);
+                            // Draw Selection Box
+                            g.lineStyle(1, 0x00B4FF, 1);
+                            // Normalize rect for negative w/h
+                            const x_ = w < 0 ? x + w : x;
+                            const y_ = h < 0 ? y + h : y;
+                            const w_ = Math.abs(w);
+                            const h_ = Math.abs(h);
+
                             g.beginFill(0x00B4FF, 0.1);
-                            g.drawRect(x, y, w, h);
+                            g.drawRect(x_, y_, w_, h_);
                             g.endFill();
                         }
 

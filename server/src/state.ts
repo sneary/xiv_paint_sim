@@ -28,7 +28,7 @@ export interface Stroke {
     points: Point[];
     width: number;
     isEraser?: boolean;
-    type?: 'freehand' | 'line' | 'circle' | 'donut' | 'cone';
+    type?: 'freehand' | 'line' | 'circle' | 'donut' | 'cone' | 'rect';
     anticlockwise?: boolean;
 }
 

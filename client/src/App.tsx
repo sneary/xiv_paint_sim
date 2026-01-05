@@ -503,7 +503,7 @@ function App() {
   const [secondaryColor, setSecondaryColor] = useState<number>(0x000000);
   const [customPalette, setCustomPalette] = useState<(number | null)[]>([null, null, null, null, null, null]);
   const [lineWidth, setLineWidth] = useState<number>(3);
-  const [tool, setTool] = useState<'select' | 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone'>('brush');
+  const [tool, setTool] = useState<'select' | 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone' | 'rect'>('brush');
   const [showLoadWarning, setShowLoadWarning] = useState<boolean>(false);
 
   // Clear text input and selection when tool changes
@@ -530,6 +530,7 @@ function App() {
 
   // Cone Interaction State
   const [conePreview, setConePreview] = useState<{ x: number, y: number, r: number, startAngle: number, endAngle: number, anticlockwise?: boolean } | null>(null);
+  const [rectPreview, setRectPreview] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
   const conePhaseRef = useRef<number>(0);
   const coneStartRef = useRef<{ x: number, y: number, r: number, startAngle: number, lastAngle: number, totalRotation: number } | null>(null);
 
@@ -542,6 +543,13 @@ function App() {
 
 
   const startStroke = (x: number, y: number) => {
+    if (tool === 'rect') {
+      setIsDrawing(true);
+      currentStrokeIdRef.current = Math.random().toString(36).substr(2, 9);
+      setRectPreview({ x, y, w: 0, h: 0 });
+      return;
+    }
+
     // If placing a marker, do that instead of drawing
     if (tool === 'select') {
       const page = gameState.pages[gameState.currentPageIndex];
@@ -806,6 +814,15 @@ function App() {
       return;
     }
 
+    if (tool === 'rect') {
+      setRectPreview(prev => prev ? {
+        ...prev,
+        w: x - prev.x,
+        h: y - prev.y
+      } : null);
+      return;
+    }
+
     if (tool === 'donut' || tool === 'circle') {
       setShapePreview(prev => {
         if (!prev) return null;
@@ -889,6 +906,7 @@ function App() {
 
       dragStartRef.current = null;
       isDraggingSelectionRef.current = false;
+      isBoxSelectingRef.current = false;
       return;
     }
 
@@ -929,6 +947,26 @@ function App() {
       setLinePreview(null);
     }
 
+    if (tool === 'rect' && rectPreview && currentStrokeIdRef.current) {
+      const { x, y, w, h } = rectPreview;
+      // Emit Start (Definition)
+      socketRef.current?.emit('startStroke', {
+        id: currentStrokeIdRef.current,
+        x, y, // Start Point
+        color: selectedColor,
+        width: lineWidth,
+        isEraser: false,
+        type: 'rect'
+      });
+      // Emit End Point (Top-Left + Size -> convert to p2)
+      // Actually rect uses 2 points like line? Arena logic uses p1 and p2.
+      // My preview uses x,y,w,h.
+      // p1 = x,y. p2 = x+w, y+h.
+      socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x: x + w, y: y + h });
+      // Clear
+      setRectPreview(null);
+    }
+
     if ((tool === 'donut' || tool === 'circle') && shapePreview && currentStrokeIdRef.current) {
       socketRef.current?.emit('drawPoint', { id: currentStrokeIdRef.current, x: shapePreview.x + shapePreview.r, y: shapePreview.y });
       setShapePreview(null);
@@ -938,6 +976,17 @@ function App() {
     currentStrokeIdRef.current = null;
     socketRef.current?.emit('endStroke');
   };
+
+  // Global Mouse Up to handle releases outside canvas
+  useEffect(() => {
+    const handleGlobalMouseUp = () => {
+      if (isDrawing || isDraggingSelectionRef.current || isBoxSelectingRef.current) {
+        endStroke();
+      }
+    };
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, [isDrawing]);
 
   // Join handler is defined above (line 147)
 
@@ -1413,9 +1462,9 @@ function App() {
                       if (isMobile) setIsToolsOpen(false);
                     }}
                   >
-                    ↖️ Select
+                    Select
                   </button>
-                  {['brush', 'eraser', 'line', 'donut', 'circle', 'text', 'cone'].map(t => (
+                  {['brush', 'eraser', 'line', 'rect', 'donut', 'circle', 'text', 'cone'].map(t => (
                     <button
                       key={t}
                       className={`tool-button ${tool === t ? 'active' : ''}`}
@@ -1424,10 +1473,10 @@ function App() {
                         if (isMobile) setIsToolsOpen(false); // Only collapse Tools section
                       }}
                     >
-                      {t === 'cone' ? 'Cone' : t.charAt(0).toUpperCase() + t.slice(1)}
+                      {t === 'cone' ? 'Cone' : t === 'rect' ? 'Rect' : t.charAt(0).toUpperCase() + t.slice(1)}
                     </button>
                   ))}
-                  <button className="tool-button warning" onClick={() => socketRef.current?.emit('undoStroke')}>Undo</button>
+                  <button className="tool-button warning" onClick={() => socketRef.current?.emit('undo')}>Undo</button>
                   <button className="tool-button danger" onClick={handleClear} style={{ gridColumn: 'span 2' }}>Clear All</button>
 
                   {/* Save/Load (Moved Inside) */}
@@ -1592,6 +1641,7 @@ function App() {
           currentWidth={lineWidth}
           selectionBox={selectionBox}
           selectedIds={selectedIds}
+          rectPreview={rectPreview}
         />
         {textInput && (
           <input

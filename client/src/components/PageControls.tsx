@@ -98,15 +98,19 @@ const PageControls: React.FC<PageControlsProps> = ({
                 style={{
                     background: 'none',
                     border: 'none',
-                    color: '#00ff00', // Bright Green
                     cursor: 'pointer',
-                    fontSize: '2rem', // Increased size for text
-                    padding: '0 8px',
-                    fontWeight: 'bold',
-                    lineHeight: '1', // Ensure vertical centering for text
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '36px',
+                    height: '36px',
+                    padding: 0,
                 }}
             >
-                +
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00ff00" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
             </button>
 
             {/* Delete Page */}
@@ -117,14 +121,19 @@ const PageControls: React.FC<PageControlsProps> = ({
                 style={{
                     background: 'none',
                     border: 'none',
-                    color: pages.length <= 1 ? '#555' : '#ff0000', // Bright Red
                     cursor: pages.length <= 1 ? 'default' : 'pointer',
-                    fontSize: '1.5rem', // Slightly larger
-                    padding: '0 8px',
-                    fontWeight: 'bold'
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '36px',
+                    height: '36px',
+                    padding: 0,
                 }}
             >
-                ❌
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={pages.length <= 1 ? '#555' : '#ff0000'} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
             </button>
         </div>
     );
