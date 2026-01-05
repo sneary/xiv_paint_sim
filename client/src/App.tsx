@@ -4,8 +4,8 @@ import { Joystick } from 'react-joystick-component';
 import './App.css';
 import Arena from './components/Arena';
 import ConfigMenu from './components/ConfigMenu';
-import type { GameState, ArenaConfig } from './types';
-
+import type { GameState, ArenaConfig, Stroke, TextObject } from './types';
+import { hitTest, getSelectionBounds } from './utils';
 import LandingPage from './components/LandingPage';
 import PartyList from './components/PartyList';
 import DebuffMenu from './components/DebuffMenu';
@@ -37,6 +37,7 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
   // Loading State
   const [isProcessing, setIsProcessing] = useState(false);
+  const [copyFeedbackSource, setCopyFeedbackSource] = useState<string | null>(null);
 
   // Store join options for auto-reconnect
   const lastJoinOptions = useRef<{
@@ -142,11 +143,11 @@ function App() {
     socketRef.current?.emit('clearLimitCut');
   };
 
-  const handleCopyRoomId = () => {
+  const handleCopyRoomId = (source: string) => {
     if (roomId) {
       navigator.clipboard.writeText(roomId).then(() => {
-        // Optional: Visual feedback could be added here
-        // For now, relying on user action
+        setCopyFeedbackSource(source);
+        setTimeout(() => setCopyFeedbackSource(null), 2000);
       }).catch(err => {
         console.error('Failed to copy room ID', err);
       });
@@ -502,12 +503,14 @@ function App() {
   const [secondaryColor, setSecondaryColor] = useState<number>(0x000000);
   const [customPalette, setCustomPalette] = useState<(number | null)[]>([null, null, null, null, null, null]);
   const [lineWidth, setLineWidth] = useState<number>(3);
-  const [tool, setTool] = useState<'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone'>('brush');
+  const [tool, setTool] = useState<'select' | 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone'>('brush');
   const [showLoadWarning, setShowLoadWarning] = useState<boolean>(false);
 
-  // Clear text input when tool changes
+  // Clear text input and selection when tool changes
   useEffect(() => {
     setTextInput(null);
+    setSelectedIds([]);
+    setSelectionBox(null);
   }, [tool]);
   const [activeMarker, setActiveMarker] = useState<string | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -527,10 +530,82 @@ function App() {
 
   // Cone Interaction State
   const [conePreview, setConePreview] = useState<{ x: number, y: number, r: number, startAngle: number, endAngle: number, anticlockwise?: boolean } | null>(null);
-  const conePhaseRef = useRef<number>(0); // 0: Idle, 1: Drag 1 (Radius), 2: Wait, 3: Drag 2 (Arc)
+  const conePhaseRef = useRef<number>(0);
   const coneStartRef = useRef<{ x: number, y: number, r: number, startAngle: number, lastAngle: number, totalRotation: number } | null>(null);
 
+  // Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selectionBox, setSelectionBox] = useState<{ x: number, y: number, w: number, h: number } | null>(null);
+  const dragStartRef = useRef<{ x: number, y: number, initialObjects: any } | null>(null); // Snapshot for diffing
+  const isDraggingSelectionRef = useRef(false);
+  const isBoxSelectingRef = useRef(false);
+
+
   const startStroke = (x: number, y: number) => {
+    // If placing a marker, do that instead of drawing
+    if (tool === 'select') {
+      const page = gameState.pages[gameState.currentPageIndex];
+      const hit = hitTest(x, y, page.strokes, page.text);
+      const hitId = (hit && hit.type === 'object') ? hit.id : null;
+
+      let clickingSelection = false;
+      if (!hitId && selectedIds.length > 0) {
+        // Check if inside selection bounds
+        const sStrokes = page.strokes.filter(s => selectedIds.includes(s.id));
+        const sText = page.text.filter(t => selectedIds.includes(t.id));
+        const bounds = getSelectionBounds(selectedIds, sStrokes, sText);
+
+        // Pad bounds slightly
+        if (bounds && bounds.minX !== Infinity &&
+          x >= bounds.minX - 10 && x <= bounds.maxX + 10 &&
+          y >= bounds.minY - 10 && y <= bounds.maxY + 10) {
+          clickingSelection = true;
+        }
+      }
+
+      if (hitId) {
+        // Hit something direct
+        isBoxSelectingRef.current = false;
+        if (selectedIds.includes(hitId)) {
+          // Clicked on already selected item -> Start Move
+          isDraggingSelectionRef.current = true;
+        } else {
+          // Clicked on new item -> Select it exclusive (TODO: Shift for add)
+          setSelectedIds([hitId]);
+          isDraggingSelectionRef.current = true;
+        }
+
+        // Snapshot initial positions for ALL selected items
+        const selectedStrokes = page.strokes.filter(s => selectedIds.includes(s.id) || s.id === hitId).map(s => ({ ...s }));
+        const selectedText = page.text.filter(t => selectedIds.includes(t.id) || t.id === hitId).map(t => ({ ...t }));
+
+        dragStartRef.current = {
+          x, y,
+          initialObjects: { strokes: selectedStrokes, text: selectedText }
+        };
+
+      } else if (clickingSelection) {
+        // Clicked inside bounds of existing selection
+        isBoxSelectingRef.current = false;
+        isDraggingSelectionRef.current = true;
+        const selectedStrokes = page.strokes.filter(s => selectedIds.includes(s.id)).map(s => ({ ...s }));
+        const selectedText = page.text.filter(t => selectedIds.includes(t.id)).map(t => ({ ...t }));
+
+        dragStartRef.current = {
+          x, y,
+          initialObjects: { strokes: selectedStrokes, text: selectedText }
+        };
+
+      } else {
+        // Hit nothing -> Start Box Selection
+        setSelectedIds([]);
+        setSelectionBox({ x, y, w: 0, h: 0 });
+        isDraggingSelectionRef.current = false;
+        isBoxSelectingRef.current = true;
+      }
+      return;
+    }
+
     // If placing a marker, do that instead of drawing
     if (activeMarker) {
       socketRef.current?.emit('placeMarker', { type: activeMarker, x, y });
@@ -626,6 +701,58 @@ function App() {
   };
 
   const moveStroke = (x: number, y: number) => {
+    // Selection Tool Logic
+    if (tool === 'select') {
+      if (isDraggingSelectionRef.current && dragStartRef.current) {
+        // Dragging Objects
+        const dx = x - dragStartRef.current.x;
+        const dy = y - dragStartRef.current.y;
+
+        // Optimistically update GameState positions (Revert on End if needed, but here we just update)
+        // We use setGameState function to ensure we don't stale-closure
+        setGameState(prev => {
+          // Shallow clone required
+          return {
+            ...prev,
+            pages: prev.pages.map((p, i) => {
+              if (i !== prev.currentPageIndex) return p;
+
+              const newStrokes = p.strokes.map(s => {
+                const init = dragStartRef.current?.initialObjects.strokes.find((is: any) => is.id === s.id);
+                if (init) {
+                  return {
+                    ...s,
+                    points: init.points.map((pt: any) => ({ x: pt.x + dx, y: pt.y + dy }))
+                  };
+                }
+                return s;
+              });
+
+              const newText = p.text.map(t => {
+                const init = dragStartRef.current?.initialObjects.text.find((it: any) => it.id === t.id);
+                if (init) {
+                  return { ...t, x: init.x + dx, y: init.y + dy };
+                }
+                return t;
+              });
+
+              return { ...p, strokes: newStrokes, text: newText };
+            })
+          };
+        });
+
+      } else if (isBoxSelectingRef.current) {
+        // Box Selection
+        setSelectionBox(prev => ({
+          x: prev?.x ?? x, // Should be set in startStroke, but fallback
+          y: prev?.y ?? y,
+          w: x - (prev?.x ?? x),
+          h: y - (prev?.y ?? y)
+        }));
+      }
+      return;
+    }
+
     if (activeMarker) return;
 
     if (tool === 'cone') {
@@ -692,6 +819,79 @@ function App() {
   };
 
   const endStroke = () => {
+    // Selection Tool Logic
+    if (tool === 'select') {
+      if (isDraggingSelectionRef.current && dragStartRef.current) {
+        // Did we actually move?
+        // Optimistically we already updated local state.
+        // Now we MUST emit the changes to server.
+        const page = gameState.pages[gameState.currentPageIndex];
+
+        const strokeUpdates: Partial<Stroke>[] = [];
+        const textUpdates: Partial<TextObject>[] = [];
+
+        // Find objects that moved (compare with initial)
+        // Actually, just emit all selected objects' current state is safer?
+        // No, sending delta or absolute? Server 'updateStrokes' takes Partial<Stroke>.
+
+        const initStrokes = dragStartRef.current.initialObjects.strokes as Stroke[];
+        const initText = dragStartRef.current.initialObjects.text as TextObject[];
+
+        initStrokes.forEach(initIn => {
+          const current = page.strokes.find(s => s.id === initIn.id);
+          if (current) {
+            // Check if changed
+            // Ideally we check equality, but always emitting is fine for now
+            strokeUpdates.push({ id: current.id, points: current.points });
+          }
+        });
+
+        initText.forEach(initIn => {
+          const current = page.text.find(t => t.id === initIn.id);
+          if (current) {
+            textUpdates.push({ id: current.id, x: current.x, y: current.y });
+          }
+        });
+
+        if (strokeUpdates.length > 0) socketRef.current?.emit('updateStrokes', { updates: strokeUpdates });
+        if (textUpdates.length > 0) socketRef.current?.emit('updateText', { updates: textUpdates });
+
+      } else if (selectionBox) {
+        // Commit Box Selection
+        const { x, y, w, h } = selectionBox;
+        // Normalize rect
+        const bx = w < 0 ? x + w : x;
+        const by = h < 0 ? y + h : y;
+        const bw = Math.abs(w);
+        const bh = Math.abs(h);
+
+        const page = gameState.pages[gameState.currentPageIndex];
+        const newSelected: string[] = [];
+
+        // Box hit test
+        // Text
+        page.text.forEach(t => {
+          if (t.x >= bx && t.x <= bx + bw && t.y >= by && t.y <= by + bh) { // simplified point in rect
+            newSelected.push(t.id);
+          }
+        });
+        // Strokes
+        page.strokes.forEach(s => {
+          // Check if ANY point is in rect? Or all? Usually Any.
+          if (s.points.some(p => p.x >= bx && p.x <= bx + bw && p.y >= by && p.y <= by + bh)) {
+            newSelected.push(s.id);
+          }
+        });
+
+        setSelectedIds(newSelected);
+        setSelectionBox(null);
+      }
+
+      dragStartRef.current = null;
+      isDraggingSelectionRef.current = false;
+      return;
+    }
+
     if (tool === 'cone') {
       if (conePhaseRef.current === 1) {
         // End Phase 1. Go to Phase 2.
@@ -1004,7 +1204,7 @@ function App() {
         {/* Room Code */}
         {roomId && (
           <div
-            onClick={handleCopyRoomId}
+            onClick={() => handleCopyRoomId('indicator')}
             title="Copy Room Code"
             style={{
               display: 'flex', alignItems: 'center', // Ensure vertical alignment
@@ -1015,9 +1215,28 @@ function App() {
               paddingLeft: '12px', // Restored padding
               height: '100%', // Full height for alignment
               letterSpacing: '0.5px',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              position: 'relative' // relative for absolute child
             }}>
             Room: {roomId}
+            {copyFeedbackSource === 'indicator' && (
+              <span style={{
+                position: 'absolute',
+                top: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: '#4CAF50',
+                color: 'white',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                marginTop: '4px',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none'
+              }}>
+                Copied!
+              </span>
+            )}
           </div>
         )}
       </div>
@@ -1186,6 +1405,16 @@ function App() {
                 onToggle={() => setIsToolsOpen(!isToolsOpen)}
               >
                 <div className="tool-grid" style={isMobile ? { margin: 0 } : {}}>
+                  {/* Select Tool */}
+                  <button
+                    className={`tool-button ${tool === 'select' ? 'active' : ''}`}
+                    onClick={() => {
+                      setTool('select');
+                      if (isMobile) setIsToolsOpen(false);
+                    }}
+                  >
+                    ↖️ Select
+                  </button>
                   {['brush', 'eraser', 'line', 'donut', 'circle', 'text', 'cone'].map(t => (
                     <button
                       key={t}
@@ -1260,11 +1489,30 @@ function App() {
             Connected as {gameState.players[myId]?.name || myId}
             {' '}
             <span
-              onClick={handleCopyRoomId}
+              onClick={() => handleCopyRoomId('main')}
               title="Copy Room Code"
-              style={{ cursor: 'pointer', textDecoration: 'underline', color: '#fff' }}
+              style={{ cursor: 'pointer', textDecoration: 'underline', color: '#fff', position: 'relative' }}
             >
               (Room: {roomId})
+              {copyFeedbackSource === 'main' && (
+                <span style={{
+                  position: 'absolute',
+                  top: '100%',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  background: '#4CAF50',
+                  color: 'white',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  fontSize: '10px',
+                  marginTop: '0px',
+                  whiteSpace: 'nowrap',
+                  pointerEvents: 'none',
+                  zIndex: 200
+                }}>
+                  Copied!
+                </span>
+              )}
             </span>
           </>
         ) : 'Connecting...'}
@@ -1342,6 +1590,8 @@ function App() {
           currentTool={tool}
           currentColor={selectedColor}
           currentWidth={lineWidth}
+          selectionBox={selectionBox}
+          selectedIds={selectedIds}
         />
         {textInput && (
           <input

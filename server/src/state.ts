@@ -47,9 +47,18 @@ export interface Page {
     strokes: Stroke[];
     markers: Record<string, Point>;
     text: TextObject[];
-    // History of actions for Undo: 'stroke' | 'text'
-    actionHistory?: string[];
+    // History of actions for Undo/Redo
+    actionHistory?: Action[];
 }
+
+export type Action =
+    | { type: 'add_stroke'; id: string }
+    | { type: 'add_text'; id: string }
+    | { type: 'update_stroke'; id: string; prev: Stroke; next: Stroke }
+    | { type: 'update_text'; id: string; prev: TextObject; next: TextObject }
+    | { type: 'delete_stroke'; prev: Stroke }
+    | { type: 'delete_text'; prev: TextObject };
+
 
 export interface GameState {
     players: Record<string, Player>;

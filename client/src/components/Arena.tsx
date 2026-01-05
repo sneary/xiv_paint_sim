@@ -18,9 +18,12 @@ interface ArenaProps {
     shapePreview?: { x: number, y: number, r: number } | null;
     conePreview?: { x: number, y: number, r: number, startAngle: number, endAngle: number, anticlockwise?: boolean } | null;
     text?: { id: string, x: number, y: number, text: string, color: number, fontSize: number }[];
-    currentTool?: 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone';
+    currentTool?: 'select' | 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone';
     currentColor?: number;
     currentWidth?: number;
+    // Selection
+    selectionBox?: { x: number, y: number, w: number, h: number } | null;
+    selectedIds?: string[];
 }
 
 const Arena = ({
@@ -40,7 +43,9 @@ const Arena = ({
     text = [],
     currentTool = 'brush',
     currentColor = 0xff0000,
-    currentWidth = 3
+    currentWidth = 3,
+    selectionBox,
+    selectedIds = []
 }: ArenaProps) => {
     // Optimization: Use ref for cursor to avoid re-rendering entire Arena on mousemove
     // We strictly use the ref for POSITION updates. 
@@ -328,6 +333,7 @@ const Arena = ({
                     ref={cursorRef}
                     draw={useCallback((g: PIXI.Graphics) => {
                         g.clear();
+                        if (currentTool === 'select') return;
                         if (currentTool === 'text') {
                             const color = currentColor ?? 0xff0000;
                             g.lineStyle(2, color, 1);
@@ -359,6 +365,66 @@ const Arena = ({
                         g.endFill();
                     }, [currentTool, currentColor, currentWidth])}
 
+                />
+
+                {/* Selection Overlay */}
+                <Graphics
+                    draw={useCallback((g: PIXI.Graphics) => {
+                        g.clear();
+
+                        // Draw Selection Box (Drag)
+                        if (selectionBox) {
+                            const { x, y, w, h } = selectionBox;
+                            g.lineStyle(1, 0x00B4FF, 0.8); // Light Blue
+                            g.drawRect(x, y, w, h);
+                            g.beginFill(0x00B4FF, 0.1);
+                            g.drawRect(x, y, w, h);
+                            g.endFill();
+                        }
+
+                        // Draw Selected Object Bounds
+                        if (selectedIds.length > 0) {
+                            g.lineStyle(1, 0x00B4FF, 1);
+
+                            strokes.forEach(s => {
+                                if (selectedIds.includes(s.id)) {
+                                    if (s.points.length === 0) return;
+                                    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                                    if (s.type === 'circle' && s.points.length >= 2) {
+                                        const c = s.points[0];
+                                        const r = Math.sqrt(Math.pow(s.points[1].x - c.x, 2) + Math.pow(s.points[1].y - c.y, 2));
+                                        minX = c.x - r; maxX = c.x + r;
+                                        minY = c.y - r; maxY = c.y + r;
+                                    } else if (s.type === 'donut' && s.points.length >= 2) {
+                                        const c = s.points[0];
+                                        const r = Math.sqrt(Math.pow(s.points[1].x - c.x, 2) + Math.pow(s.points[1].y - c.y, 2));
+                                        minX = c.x - r; maxX = c.x + r;
+                                        minY = c.y - r; maxY = c.y + r;
+                                    } else {
+                                        s.points.forEach(p => {
+                                            if (p.x < minX) minX = p.x;
+                                            if (p.x > maxX) maxX = p.x;
+                                            if (p.y < minY) minY = p.y;
+                                            if (p.y > maxY) maxY = p.y;
+                                        });
+                                    }
+                                    const pad = (s.width || 3) / 2 + 5;
+                                    g.drawRect(minX - pad, minY - pad, maxX - minX + pad * 2, maxY - minY + pad * 2);
+                                }
+                            });
+
+                            if (text) {
+                                text.forEach(t => {
+                                    if (selectedIds.includes(t.id)) {
+                                        const w = t.text.length * (t.fontSize || 20) * 0.6;
+                                        const h = t.fontSize || 20;
+                                        g.drawRect(t.x - 2, t.y - h - 2, w + 4, h + 4);
+                                    }
+                                });
+                            }
+                        }
+
+                    }, [selectionBox, selectedIds, strokes, text])}
                 />
 
                 {/* Players */}

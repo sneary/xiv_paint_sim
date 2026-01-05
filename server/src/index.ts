@@ -60,7 +60,7 @@ io.on('connection', (socket: Socket) => {
         if (data.action === 'create') {
             roomId = generateRoomId();
             rooms[roomId] = createInitialState();
-            console.log(`Room created: ${roomId}`);
+            console.log(`Room created: ${roomId} `);
         } else {
             // Join existing
             if (!roomId || !rooms[roomId]) {
@@ -216,7 +216,7 @@ io.on('connection', (socket: Socket) => {
             anticlockwise: data.anticlockwise
         });
         if (!page.actionHistory) page.actionHistory = [];
-        page.actionHistory.push('stroke');
+        page.actionHistory.push({ type: 'add_stroke', id: data.id });
 
         io.to(currentRoomId).emit('stateUpdate', gs);
     });
@@ -229,7 +229,7 @@ io.on('connection', (socket: Socket) => {
         page.text.push(textObj);
 
         if (!page.actionHistory) page.actionHistory = [];
-        page.actionHistory.push('text');
+        page.actionHistory.push({ type: 'add_text', id: textObj.id });
 
         io.to(currentRoomId).emit('stateUpdate', gs);
     });
@@ -245,29 +245,92 @@ io.on('connection', (socket: Socket) => {
         }
     });
 
-    socket.on('endStroke', () => { }); // No-op
+    socket.on('endStroke', () => { });
 
-    // Undo logic simplified for Room context
-    socket.on('undoStroke', () => {
+    socket.on('updateStrokes', (data: { updates: Partial<any>[] }) => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
         const gs = rooms[currentRoomId];
         const page = gs.pages[gs.currentPageIndex];
-        // Ideally we'd have a per-room action history.
-        // Check actionHistory first
+
+        if (!page.actionHistory) page.actionHistory = [];
+
+        data.updates.forEach(update => {
+            const index = page.strokes.findIndex(s => s.id === update.id);
+            if (index !== -1) {
+                const prev = JSON.parse(JSON.stringify(page.strokes[index]));
+                // Apply update
+                Object.assign(page.strokes[index], update);
+                const next = JSON.parse(JSON.stringify(page.strokes[index]));
+
+                // Record Action
+                page.actionHistory!.push({
+                    type: 'update_stroke',
+                    id: update.id,
+                    prev,
+                    next
+                });
+            }
+        });
+        io.to(currentRoomId).emit('stateUpdate', gs);
+    });
+
+    socket.on('updateText', (data: { updates: Partial<any>[] }) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const gs = rooms[currentRoomId];
+        const page = gs.pages[gs.currentPageIndex];
+
+        if (!page.actionHistory) page.actionHistory = [];
+
+        data.updates.forEach(update => {
+            const index = page.text.findIndex(t => t.id === update.id);
+            if (index !== -1) {
+                const prev = JSON.parse(JSON.stringify(page.text[index]));
+                Object.assign(page.text[index], update);
+                const next = JSON.parse(JSON.stringify(page.text[index]));
+
+                page.actionHistory!.push({
+                    type: 'update_text',
+                    id: update.id,
+                    prev,
+                    next
+                });
+            }
+        });
+        io.to(currentRoomId).emit('stateUpdate', gs);
+    });
+
+    socket.on('undo', () => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const gs = rooms[currentRoomId];
+        const page = gs.pages[gs.currentPageIndex];
+
         if (page.actionHistory && page.actionHistory.length > 0) {
-            const lastAction = page.actionHistory.pop();
-            if (lastAction === 'stroke') {
-                if (page.strokes.length > 0) page.strokes.pop();
-            } else if (lastAction === 'text') {
-                if (page.text && page.text.length > 0) page.text.pop();
+            const action = page.actionHistory.pop();
+
+            if (action?.type === 'add_stroke') {
+                page.strokes = page.strokes.filter(s => s.id !== action.id);
+            } else if (action?.type === 'add_text') {
+                page.text = page.text.filter(t => t.id !== action.id);
+            } else if (action?.type === 'update_stroke') {
+                const index = page.strokes.findIndex(s => s.id === action.id);
+                if (index !== -1 && action.prev) {
+                    page.strokes[index] = action.prev;
+                }
+            } else if (action?.type === 'update_text') {
+                const index = page.text.findIndex(t => t.id === action.id);
+                if (index !== -1 && action.prev) {
+                    page.text[index] = action.prev;
+                }
+            } else if (action?.type === 'delete_stroke') {
+                // To implement delete undo, we'd need to re-add it. 
+                // (Not implemented yet, but placeholders useful)
+                if (action.prev) page.strokes.push(action.prev);
             }
+            else if (action?.type === 'delete_text') {
+                if (action.prev) page.text.push(action.prev);
+            }
+
             io.to(currentRoomId).emit('stateUpdate', gs);
-        } else {
-            // Legacy fallback if no history (or old rooms)
-            if (page.strokes.length > 0) {
-                page.strokes.pop();
-                io.to(currentRoomId).emit('stateUpdate', gs);
-            }
         }
     });
 
@@ -496,7 +559,7 @@ io.on('connection', (socket: Socket) => {
 
     socket.on('disconnect', () => {
         if (currentRoomId && rooms[currentRoomId]) {
-            console.log(`User ${socket.id} disconnected from room ${currentRoomId}`);
+            console.log(`User ${socket.id} disconnected from room ${currentRoomId} `);
             delete rooms[currentRoomId].players[socket.id];
 
             // Logic to clean up empty rooms?
@@ -510,12 +573,12 @@ io.on('connection', (socket: Socket) => {
 
                 // If room is empty, schedule deletion in 5 minutes
                 if (!roomDeletionTimers[currentRoomId]) {
-                    console.log(`Room ${currentRoomId} is empty. Scheduling deletion in 5 minutes.`);
+                    console.log(`Room ${currentRoomId} is empty.Scheduling deletion in 5 minutes.`);
                     roomDeletionTimers[currentRoomId] = setTimeout(() => {
                         if (currentRoomId && rooms[currentRoomId]) {
                             // Double check if empty (though timer should be cleared if acted upon)
                             if (Object.keys(rooms[currentRoomId].players).length === 0) {
-                                console.log(`Deleting empty room: ${currentRoomId}`);
+                                console.log(`Deleting empty room: ${currentRoomId} `);
                                 delete rooms[currentRoomId];
                                 delete roomDeletionTimers[currentRoomId];
                             }
@@ -537,5 +600,5 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`Server running on port ${PORT} `);
 });
