@@ -62,6 +62,11 @@ function App() {
   // UI Visibility
   const [showConfig, setShowConfig] = useState(!isMobile);
   const [showTools, setShowTools] = useState(!isMobile);
+
+  // Sub-menu states (Default: Tools open, Waymarks closed)
+  const [isToolsOpen, setIsToolsOpen] = useState(true);
+  const [isWaymarksOpen, setIsWaymarksOpen] = useState(false);
+
   const [scale, setScale] = useState(1);
 
   // Helper to safely get current page

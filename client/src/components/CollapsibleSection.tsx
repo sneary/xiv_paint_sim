@@ -4,10 +4,16 @@ interface CollapsibleSectionProps {
     title: string;
     children: React.ReactNode;
     defaultOpen?: boolean;
+    isOpen?: boolean;
+    onToggle?: () => void;
 }
 
-const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, children, defaultOpen = false }) => {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
+const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, children, defaultOpen = false, isOpen, onToggle }) => {
+    const [internalOpen, setInternalOpen] = useState(defaultOpen);
+
+    // Determine if controlled or uncontrolled
+    const isOpenState = isOpen !== undefined ? isOpen : internalOpen;
+    const toggle = onToggle || (() => setInternalOpen(!internalOpen));
 
     return (
         <div style={{
@@ -18,7 +24,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, children
             marginBottom: '5px'
         }}>
             <div
-                onClick={() => setIsOpen(!isOpen)}
+                onClick={toggle}
                 style={{
                     padding: '8px 10px',
                     background: '#333',
@@ -37,7 +43,7 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, children
                 <button
                     onClick={(e) => {
                         e.stopPropagation();
-                        setIsOpen(!isOpen);
+                        toggle();
                     }}
                     style={{
                         background: '#555',
@@ -55,10 +61,10 @@ const CollapsibleSection: React.FC<CollapsibleSectionProps> = ({ title, children
                         fontSize: '14px'
                     }}
                 >
-                    {isOpen ? '−' : '+'}
+                    {isOpenState ? '−' : '+'}
                 </button>
             </div>
-            {isOpen && (
+            {isOpenState && (
                 <div style={{ padding: '10px' }}>
                     {children}
                 </div>
