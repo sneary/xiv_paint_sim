@@ -74,6 +74,18 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                 </label>
             </div>
 
+            <div style={{ marginBottom: '10px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                    <input
+                        type="checkbox"
+                        checked={!!config.muteHonks}
+                        onChange={(e) => onUpdate({ muteHonks: e.target.checked })}
+                        style={{ marginRight: '10px' }}
+                    />
+                    Mute Honks
+                </label>
+            </div>
+
             <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '15px 0' }} />
 
             <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
@@ -145,7 +157,7 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                     Clear LC
                 </button>
             </div>
-        </div>
+        </div >
     );
 };
 

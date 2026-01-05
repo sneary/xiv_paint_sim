@@ -202,7 +202,12 @@ function App() {
     newSocket.on('honk', (id: string) => {
       // Trigger visual effect
       setHonkingPlayers(prev => ({ ...prev, [id]: Date.now() }));
-      playHonkSound();
+
+      // Check for mute setting from current page config
+      const currentPage = gameStateRef.current.pages[gameStateRef.current.currentPageIndex];
+      if (!currentPage?.config?.muteHonks) {
+        playHonkSound();
+      }
 
       // Clear effect after 200ms
       setTimeout(() => {
