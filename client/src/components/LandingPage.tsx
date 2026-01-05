@@ -128,7 +128,7 @@ const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId, isLoa
             <div className="landing-container">
                 <div className="landing-content">
                     <div className="title-group">
-                        <h1 className="main-title">FFXIV Paint Sim</h1>
+                        <h1 className="main-title">XIV Paint Sim</h1>
                         <div className="subtitle">Live Multiplayer Raid Plan Tool</div>
                     </div>
 
