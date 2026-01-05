@@ -212,7 +212,8 @@ io.on('connection', (socket: Socket) => {
             points: [{ x: data.x, y: data.y }],
             width: data.width || 3,
             isEraser: !!data.isEraser,
-            type: data.type || 'freehand'
+            type: data.type || 'freehand',
+            anticlockwise: data.anticlockwise
         });
         if (!page.actionHistory) page.actionHistory = [];
         page.actionHistory.push('stroke');
