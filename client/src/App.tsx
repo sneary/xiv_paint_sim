@@ -37,6 +37,8 @@ function App() {
 
   const [countdown, setCountdown] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  // Loading State
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Store join options for auto-reconnect
   const lastJoinOptions = useRef<{
@@ -201,10 +203,15 @@ function App() {
       });
     });
 
+    // Loading State was here (removed)
+
+    // ... (keep existing useEffects)
+
     newSocket.on('joinSuccess', (data: { roomId: string }) => {
       setRoomId(data.roomId);
       setIsJoined(true);
       setJoinError('');
+      setIsProcessing(false); // Stop loading
 
       // Update persistence so if we crash/reconnect, we rejoin THIS room, not create a new one
       if (lastJoinOptions.current) {
@@ -216,6 +223,7 @@ function App() {
     newSocket.on('joinError', (msg: string) => {
       setJoinError(msg);
       setIsJoined(false);
+      setIsProcessing(false); // Stop loading
     });
 
     newSocket.on('countdown', (val: string | null) => {
@@ -270,11 +278,28 @@ function App() {
   }, []);
 
   const handleJoin = (data: { action: 'create' | 'join', roomId?: string, name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => {
-    // Save for auto-reconnect
-    lastJoinOptions.current = data;
+    if (socketRef.current && socketRef.current.connected) {
+      console.log('Emitting joinGame:', data);
+      setIsProcessing(true);
+      setJoinError(''); // Clear previous errors
 
-    if (socketRef.current) {
       socketRef.current.emit('joinGame', data);
+      lastJoinOptions.current = data;
+
+      // Timeout Safety Net
+      setTimeout(() => {
+        setIsProcessing(prev => {
+          if (prev) {
+            setJoinError('Server timed out. Please try again.');
+            return false;
+          }
+          return false;
+        });
+      }, 10000); // 10 seconds timeout
+
+    } else {
+      console.error('Socket not connected');
+      setJoinError('Socket not connected. Please wait...');
     }
   };
 
@@ -776,6 +801,7 @@ function App() {
           onCheckRoom={handleCheckRoom}
           isConnected={isConnected}
           socketId={socketRef.current?.id}
+          isLoading={isProcessing}
         />
         {joinError && (
           <div style={{

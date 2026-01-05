@@ -6,6 +6,7 @@ interface LandingPageProps {
     onCheckRoom: (roomId: string) => Promise<{ exists: boolean, takenNames: string[], takenColors: number[] }>;
     isConnected?: boolean;
     socketId?: string;
+    isLoading?: boolean;
 }
 
 const COLORS = [
@@ -13,7 +14,7 @@ const COLORS = [
     0xff00ff, 0x00ffff, 0xffffff, 0xCC5500
 ];
 
-const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId }: LandingPageProps) => {
+const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId, isLoading = false }: LandingPageProps) => {
 
     const [mode, setMode] = useState<'create' | 'join'>('create');
     const [roomId, setRoomId] = useState('');
@@ -273,13 +274,13 @@ const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId }: Lan
                             <button
                                 className="join-button"
                                 type="submit"
-                                disabled={!name.trim() || (mode === 'join' && roomId.length !== 4) || !isConnected}
+                                disabled={!name.trim() || (mode === 'join' && roomId.length !== 4) || !isConnected || isLoading}
                                 style={{
-                                    opacity: !isConnected ? 0.7 : 1,
-                                    cursor: !isConnected ? 'not-allowed' : 'pointer'
+                                    opacity: (!isConnected || isLoading) ? 0.7 : 1,
+                                    cursor: (!isConnected || isLoading) ? 'not-allowed' : 'pointer'
                                 }}
                             >
-                                {!isConnected ? 'Connecting...' : (isSpectator ? 'Watch Game' : (mode === 'create' ? 'Create Room' : 'Join Room'))}
+                                {!isConnected ? 'Connecting...' : (isLoading ? (mode === 'create' ? 'Creating Room...' : 'Joining...') : (isSpectator ? 'Watch Game' : (mode === 'create' ? 'Create Room' : 'Join Room')))}
                             </button>
                         </form>
 
