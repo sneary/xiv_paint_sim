@@ -186,32 +186,14 @@ function App() {
       setCountdown(val);
     });
 
-    // Helper for synth sound
-    let audioCtx: AudioContext | null = null;
+    // Helper for sound
     const playHonkSound = () => {
       try {
-        if (!audioCtx) {
-          audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-        }
-        if (audioCtx.state === 'suspended') {
-          audioCtx.resume().catch(() => { });
-        }
-
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(120, audioCtx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.15);
-
-        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
-
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.2);
+        const audio = new Audio('/honk.mp3');
+        audio.volume = 0.1; // Reduced volume as requested
+        audio.play().catch(e => {
+          console.warn('Honk playback failed (user interaction needed?):', e);
+        });
       } catch (e) {
         console.error('Audio error', e);
       }
