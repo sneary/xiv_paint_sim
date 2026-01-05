@@ -8,11 +8,9 @@ interface ConfigMenuProps {
     onLimitCut: () => void;
     onClearLimitCut: () => void;
     onClose?: () => void;
-    muteHonks: boolean; // Local state
-    onToggleMuteHonks: (val: boolean) => void;
 }
 
-const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onClose, muteHonks, onToggleMuteHonks }: ConfigMenuProps) => {
+const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onClose }: ConfigMenuProps) => {
     return (
         <div style={{
             backgroundColor: 'rgba(30, 30, 30, 0.9)',
@@ -76,17 +74,7 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                 </label>
             </div>
 
-            <div style={{ marginBottom: '10px' }}>
-                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-                    <input
-                        type="checkbox"
-                        checked={!!muteHonks}
-                        onChange={(e) => onToggleMuteHonks(e.target.checked)}
-                        style={{ marginRight: '10px' }}
-                    />
-                    Mute Honks
-                </label>
-            </div>
+            {/* Mute Honks moved to main UI */}
 
             <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '15px 0' }} />
 

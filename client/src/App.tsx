@@ -65,7 +65,7 @@ function App() {
   const [scale, setScale] = useState(1);
 
   // Helper to safely get current page
-  const currentPage = gameState.pages[gameState.currentPageIndex] || gameState.pages[0];
+  // Helper to safely get current page (unused, removed)
 
   useEffect(() => {
     const handleResize = () => {
@@ -109,6 +109,33 @@ function App() {
 
   // Honk State
   const [honkingPlayers, setHonkingPlayers] = useState<Record<string, number>>({});
+
+  // Mute State
+  const [muteHonks, setMuteHonks] = useState(false);
+  const muteHonksRef = useRef(false);
+  useEffect(() => { muteHonksRef.current = muteHonks; }, [muteHonks]);
+
+  // Handlers for Config Menu (Hoist them here or use inline, but defining is cleaner)
+  const handleClearDebuffs = () => {
+    if (socketRef.current) {
+      const updates: Record<string, number[]> = {};
+      // We need to access current gameState players... 
+      // Ideally we pass this logic or define it where gameState is accessible.
+      // gameState is state, so accessible here.
+      Object.keys(gameState.players).forEach(id => {
+        updates[id] = [];
+      });
+      socketRef.current.emit('updateDebuffs', updates);
+    }
+  };
+
+  const handleLimitCut = () => {
+    socketRef.current?.emit('limitCut');
+  };
+
+  const handleClearLimitCut = () => {
+    socketRef.current?.emit('clearLimitCut');
+  };
 
   // Socket Events
   useEffect(() => {
@@ -798,13 +825,50 @@ function App() {
                 onLimitCut={handleLimitCut}
                 onClearLimitCut={handleClearLimitCut}
                 onClose={() => setShowConfig(false)}
-                muteHonks={muteHonks}
-                onToggleMuteHonks={setMuteHonks}
               />
             </div>
           </div>
         )
       }
+
+      {/* Floating Mute Button (Bottom Right) */}
+      <div
+        onClick={() => setMuteHonks(!muteHonks)}
+        style={{
+          position: 'absolute',
+          bottom: 20,
+          right: 20,
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          backgroundColor: 'rgba(20, 20, 25, 0.8)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 1000,
+          color: muteHonks ? '#ff4444' : '#fff',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+          transition: 'all 0.2s ease'
+        }}
+        title={muteHonks ? "Unmute Honks" : "Mute Honks"}
+      >
+        {muteHonks ? (
+          /* Muted Icon (Simple Cross) */
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 5L6 9H2v6h4l5 4V5z"></path>
+            <line x1="23" y1="9" x2="17" y2="15"></line>
+            <line x1="17" y1="9" x2="23" y2="15"></line>
+          </svg>
+        ) : (
+          /* Speaker Icon */
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          </svg>
+        )}
+      </div>
 
       {/* Mobile Joystick - Bottom Left */}
       {
