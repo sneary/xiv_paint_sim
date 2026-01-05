@@ -78,7 +78,7 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
 
             <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '15px 0' }} />
 
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                 <button
                     onClick={onSetDebuffs}
                     style={{
@@ -90,7 +90,8 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                         cursor: 'pointer',
                         fontFamily: "'Outfit', sans-serif",
                         fontSize: '12px',
-                        flex: 1
+                        height: '32px', // Fixed height
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}
                 >
                     Set Debuffs
@@ -106,14 +107,12 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                         cursor: 'pointer',
                         fontFamily: "'Outfit', sans-serif",
                         fontSize: '12px',
-                        flex: 1
+                        height: '32px', // Fixed height
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}
                 >
                     Clear Debuffs
                 </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '10px' }}>
                 <button
                     onClick={onLimitCut}
                     style={{
@@ -125,7 +124,8 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                         cursor: 'pointer',
                         fontFamily: "'Outfit', sans-serif",
                         fontSize: '12px',
-                        flex: 1
+                        height: '32px', // Fixed height
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}
                 >
                     Limit Cut
@@ -141,7 +141,8 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                         cursor: 'pointer',
                         fontFamily: "'Outfit', sans-serif",
                         fontSize: '12px',
-                        flex: 1
+                        height: '32px', // Fixed height
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
                     }}
                 >
                     Clear LC

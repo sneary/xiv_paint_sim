@@ -65,8 +65,8 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
             zIndex: 300,
             color: 'white',
             fontFamily: "'Outfit', sans-serif",
-            minWidth: '550px',
-            maxWidth: '90vw',
+            width: '95vw',
+            maxWidth: '550px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
         }}>
             <h2 style={{ marginTop: 0, marginBottom: '20px', textAlign: 'center' }}>Set Debuffs & Limit Cut</h2>
