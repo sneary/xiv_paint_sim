@@ -7,10 +7,11 @@ interface ConfigMenuProps {
     onClearDebuffs: () => void;
     onLimitCut: () => void;
     onClearLimitCut: () => void;
+    onCountdown: () => void;
     onClose?: () => void;
 }
 
-const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onClose }: ConfigMenuProps) => {
+const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onCountdown, onClose }: ConfigMenuProps) => {
     return (
         <div style={{
             backgroundColor: 'rgba(30, 30, 30, 0.9)',
@@ -146,6 +147,25 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                     }}
                 >
                     Clear LC
+                </button>
+                <button
+                    onClick={() => onCountdown && onCountdown()}
+                    style={{
+                        gridColumn: 'span 2',
+                        background: 'rgba(255, 215, 0, 0.1)',
+                        border: '1px solid #FFD700',
+                        color: '#FFD700',
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '12px',
+                        height: '32px', // Fixed height
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontWeight: 'bold'
+                    }}
+                >
+                    Countdown (3s)
                 </button>
             </div>
         </div >

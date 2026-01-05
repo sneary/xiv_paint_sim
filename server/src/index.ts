@@ -346,6 +346,24 @@ io.on('connection', (socket: Socket) => {
         }, 1000);
     });
 
+    socket.on('startCountdown', () => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const room = currentRoomId;
+
+        // Exactly mimics startDebuffCountdown logic (3s)
+        io.to(room).emit('countdown', '3');
+        setTimeout(() => {
+            io.to(room).emit('countdown', '2');
+            setTimeout(() => {
+                io.to(room).emit('countdown', '1');
+                setTimeout(() => {
+                    io.to(room).emit('countdown', 'START');
+                    setTimeout(() => io.to(room).emit('countdown', null), 1000);
+                }, 1000);
+            }, 1000);
+        }, 1000);
+    });
+
     socket.on('updateDebuffs', (updates) => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
         const gs = rooms[currentRoomId];

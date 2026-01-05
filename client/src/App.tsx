@@ -881,6 +881,7 @@ function App() {
                 onClearDebuffs={handleClearDebuffs}
                 onLimitCut={handleLimitCut}
                 onClearLimitCut={handleClearLimitCut}
+                onCountdown={() => socketRef.current?.emit('startCountdown')}
                 onClose={() => setShowConfig(false)}
               />
             </div>
