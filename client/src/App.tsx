@@ -1030,77 +1030,124 @@ function App() {
               </button>
             </div>
 
-            {/* Colors Section (Static) */}
-            <div>
+            {/* Container for Colors + Size */}
+            <div style={{
+              display: 'flex',
+              flexDirection: isMobile ? 'row' : 'column',
+              gap: '10px'
+            }}>
+              {/* Colors Section (Flex 1 on mobile to share space) */}
+              <div style={{ flex: isMobile ? 1 : 'initial' }}>
+                {!isMobile && <h3 style={{ margin: '0 0 5px 0', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>Colors</h3>}
 
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(6, 30px)',
-                gap: '6px',
-                // justifyContent: 'center' removed for left alignment
-              }}>
-                {(() => {
-                  const PALETTE_COLORS = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0xCC5500];
-                  const renderSwatch = (color: number) => (
-                    <div
-                      key={color}
-                      className={`color-swatch ${tool === 'brush' && selectedColor === color ? 'selected' : ''}`}
-                      onClick={() => { setTool('brush'); setSelectedColor(color); }}
-                      style={{ backgroundColor: '#' + color.toString(16).padStart(6, '0'), width: '100%', height: '100%' }}
-                    />
-                  );
-                  const renderCustomSlot = (index: number) => {
-                    const color = customPalette[index];
-                    const isSelected = tool === 'brush' && selectedColor === color;
-                    return (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(6, 30px)',
+                  gap: '6px',
+                }}>
+                  {(() => {
+                    const PALETTE_COLORS = [0xff0000, 0x00ff00, 0x0000ff, 0xffff00, 0xff00ff, 0x00ffff, 0xffffff, 0xCC5500];
+                    const renderSwatch = (color: number) => (
                       <div
-                        key={`custom-${index}`}
-                        className={`custom-slot ${isSelected ? 'selected' : ''}`}
-                        style={color !== null ? { backgroundColor: '#' + color.toString(16).padStart(6, '0') } : {}}
-                      >
-                        <input type="color" value={color !== null ? '#' + color.toString(16).padStart(6, '0') : '#000000'} onChange={(e) => {
-                          const val = parseInt(e.target.value.replace('#', ''), 16);
-                          const newPalette = [...customPalette];
-                          newPalette[index] = val;
-                          setCustomPalette(newPalette);
-                          setSelectedColor(val);
-                          setTool('brush');
-                        }} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0 }} />
-                        {color === null && <span>+</span>}
-                      </div>
+                        key={color}
+                        className={`color-swatch ${tool === 'brush' && selectedColor === color ? 'selected' : ''}`}
+                        onClick={() => { setTool('brush'); setSelectedColor(color); }}
+                        style={{ backgroundColor: '#' + color.toString(16).padStart(6, '0'), width: '100%', height: '100%' }}
+                      />
                     );
-                  };
-                  return (
-                    <>
-                      {PALETTE_COLORS.slice(0, 4).map(renderSwatch)}
-                      {renderCustomSlot(0)}
-                      {renderCustomSlot(1)}
-                      {PALETTE_COLORS.slice(4, 8).map(renderSwatch)}
-                      {renderCustomSlot(2)}
-                      {renderCustomSlot(3)}
-                      <div className={`rainbow-button ${tool === 'brush' && !PALETTE_COLORS.includes(selectedColor) && !customPalette.includes(selectedColor) ? 'selected' : ''}`} style={{ position: 'relative', overflow: 'hidden', gridColumn: 'span 2', width: '100%' }}>
-                        <input type="color" value={'#' + selectedColor.toString(16).padStart(6, '0')} onChange={(e) => { setSelectedColor(parseInt(e.target.value.replace('#', ''), 16)); setTool('brush'); }} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0 }} />
-                      </div>
-                      <div className="swap-control" title="Swap Colors" style={{ gridColumn: 'span 2', width: '100%' }} onClick={() => { const old = selectedColor; setSelectedColor(secondaryColor); setSecondaryColor(old); }}>
-                        <div className="swap-secondary" style={{ backgroundColor: '#' + secondaryColor.toString(16).padStart(6, '0') }} />
-                        <div className="swap-primary" style={{ backgroundColor: '#' + selectedColor.toString(16).padStart(6, '0') }} />
-                        <div className="swap-icon">↹</div>
-                      </div>
-                      {renderCustomSlot(4)}
-                      {renderCustomSlot(5)}
-                    </>
-                  );
-                })()}
+                    const renderCustomSlot = (index: number) => {
+                      const color = customPalette[index];
+                      const isSelected = tool === 'brush' && selectedColor === color;
+                      return (
+                        <div
+                          key={`custom-${index}`}
+                          className={`custom-slot ${isSelected ? 'selected' : ''}`}
+                          style={color !== null ? { backgroundColor: '#' + color.toString(16).padStart(6, '0') } : {}}
+                        >
+                          <input type="color" value={color !== null ? '#' + color.toString(16).padStart(6, '0') : '#000000'} onChange={(e) => {
+                            const val = parseInt(e.target.value.replace('#', ''), 16);
+                            const newPalette = [...customPalette];
+                            newPalette[index] = val;
+                            setCustomPalette(newPalette);
+                            setSelectedColor(val);
+                            setTool('brush');
+                          }} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0 }} />
+                          {color === null && <span>+</span>}
+                        </div>
+                      );
+                    };
+                    return (
+                      <>
+                        {PALETTE_COLORS.slice(0, 4).map(renderSwatch)}
+                        {renderCustomSlot(0)}
+                        {renderCustomSlot(1)}
+                        {PALETTE_COLORS.slice(4, 8).map(renderSwatch)}
+                        {renderCustomSlot(2)}
+                        {renderCustomSlot(3)}
+                        <div className={`rainbow-button ${tool === 'brush' && !PALETTE_COLORS.includes(selectedColor) && !customPalette.includes(selectedColor) ? 'selected' : ''}`} style={{ position: 'relative', overflow: 'hidden', gridColumn: 'span 2', width: '100%' }}>
+                          <input type="color" value={'#' + selectedColor.toString(16).padStart(6, '0')} onChange={(e) => { setSelectedColor(parseInt(e.target.value.replace('#', ''), 16)); setTool('brush'); }} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0 }} />
+                        </div>
+                        <div className="swap-control" title="Swap Colors" style={{ gridColumn: 'span 2', width: '100%' }} onClick={() => { const old = selectedColor; setSelectedColor(secondaryColor); setSecondaryColor(old); }}>
+                          <div className="swap-secondary" style={{ backgroundColor: '#' + secondaryColor.toString(16).padStart(6, '0') }} />
+                          <div className="swap-primary" style={{ backgroundColor: '#' + selectedColor.toString(16).padStart(6, '0') }} />
+                          <div className="swap-icon">↹</div>
+                        </div>
+                        {renderCustomSlot(4)}
+                        {renderCustomSlot(5)}
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
-            </div>
 
-            {/* Brush Size Section (Static) */}
-            <div>
-              <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>Brush Size: {lineWidth}px</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px', justifyContent: 'center' }}>
-                <input type="range" min="1" max="40" value={lineWidth} onChange={(e) => setLineWidth(Number(e.target.value))} style={{ flex: 1 }} />
-                <div style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#222', borderRadius: '4px', border: '1px solid #555' }}>
-                  <div style={{ width: lineWidth + 'px', height: lineWidth + 'px', background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'), borderRadius: '50%', border: tool === 'eraser' ? '1px solid #999' : 'none' }} />
+              {/* Brush Size Section (Right Vertical on Mobile, Bottom Horizontal on Desktop) */}
+              <div style={isMobile ? {
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderLeft: '1px solid #444',
+                paddingLeft: '10px',
+                width: '60px'
+              } : {}}>
+                {!isMobile && <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>Brush Size: {lineWidth}px</h3>}
+
+                <div style={{
+                  display: 'flex',
+                  flexDirection: isMobile ? 'column-reverse' : 'row', // Vertical slider on mobile needs reverse to have 'Up' be max
+                  alignItems: 'center',
+                  gap: '15px',
+                  justifyContent: 'center',
+                  height: isMobile ? '100%' : 'auto'
+                }}>
+                  {/* Slider */}
+                  <div style={isMobile ? {
+                    display: 'flex',
+                    alignItems: 'center',
+                    height: '150px', // Explicit height for vertical slider area
+                    width: '30px',
+                    position: 'relative' // Needed for rotated input if we go that route, or just css writing-mode
+                  } : { flex: 1 }}>
+                    <input
+                      type="range"
+                      min="1"
+                      max="40"
+                      value={lineWidth}
+                      onChange={(e) => setLineWidth(Number(e.target.value))}
+                      style={isMobile ? {
+                        writingMode: 'vertical-lr',
+                        direction: 'rtl', // Makes Up = larger
+                        width: '30px',
+                        height: '100%',
+                        appearance: 'slider-vertical' // Non-standard but works in some browsers, fallback to transform
+                      } : { width: '100%' }}
+                    />
+                  </div>
+
+                  {/* Preview Dot */}
+                  <div style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#222', borderRadius: '4px', border: '1px solid #555', flexShrink: 0 }}>
+                    <div style={{ width: lineWidth + 'px', height: lineWidth + 'px', background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'), borderRadius: '50%', border: tool === 'eraser' ? '1px solid #999' : 'none' }} />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1117,7 +1164,27 @@ function App() {
                 <button className={`tool-button ${tool === 'cone' ? 'active' : ''}`} onClick={() => setTool('cone')}>Fan/Cone</button>
                 <button className="tool-button warning" onClick={() => socketRef.current?.emit('undoStroke')}>Undo</button>
                 <button className="tool-button danger" onClick={handleClear} style={{ gridColumn: 'span 2' }}>Clear All</button>
+
+                {/* Save/Load (Moved Inside) */}
+                <button onClick={handleSave} style={{ gridColumn: 'span 1', background: '#4CAF50', border: '1px solid #388E3C', borderRadius: '4px', color: 'white', padding: '8px', cursor: 'pointer' }}>Save</button>
+                <button onClick={() => setShowLoadWarning(!showLoadWarning)} style={{ gridColumn: 'span 1', background: '#2196F3', border: '1px solid #1976D2', borderRadius: '4px', color: 'white', padding: '8px', cursor: 'pointer' }}>Load</button>
               </div>
+
+              {/* Load Warning Flow (Inside Tools now) */}
+              {showLoadWarning && (
+                <div style={{ marginTop: '10px', padding: '10px', background: '#330000', border: '1px solid #ff4444', borderRadius: '4px' }}>
+                  <div style={{ color: '#ff4444', fontSize: '12px', marginBottom: '10px' }}>
+                    Warning: Loading will fully replace all current pages.
+                  </div>
+                  <div style={{ display: 'flex', gap: '5px' }}>
+                    <label style={{ padding: '5px 10px', background: '#d32f2f', border: '1px solid #b71c1c', borderRadius: '4px', color: 'white', fontSize: '12px', display: 'inline-block', cursor: 'pointer' }}>
+                      Confirm Load
+                      <input type="file" accept=".json" onChange={(e) => { handleLoad(e); setShowLoadWarning(false); }} style={{ display: 'none' }} />
+                    </label>
+                    <button onClick={() => setShowLoadWarning(false)} style={{ padding: '5px 10px', background: '#555', border: '1px solid #777', borderRadius: '4px', color: 'white', fontSize: '12px', cursor: 'pointer' }}>Cancel</button>
+                  </div>
+                </div>
+              )}
             </CollapsibleSection>
 
             {/* Waymarks Section (Universal) */}
@@ -1128,29 +1195,6 @@ function App() {
                 onClearAll={() => socketRef.current?.emit('clearMarkers')}
               />
             </CollapsibleSection>
-
-
-            {/* Save/Load (Separate - Always visible at bottom of panel) */}
-            <div style={{ display: 'flex', gap: '5px', marginTop: '5px' }}>
-              <button onClick={handleSave} style={{ flex: 1, padding: '8px', background: '#4CAF50', border: '1px solid #388E3C', borderRadius: '4px', color: 'white' }}>Save</button>
-              <button onClick={() => setShowLoadWarning(!showLoadWarning)} style={{ flex: 1, padding: '8px', background: '#2196F3', border: '1px solid #1976D2', borderRadius: '4px', color: 'white' }}>Load</button>
-            </div>
-
-            {/* Load Warning Flow */}
-            {showLoadWarning && (
-              <div style={{ marginTop: '10px', padding: '10px', background: '#330000', border: '1px solid #ff4444', borderRadius: '4px' }}>
-                <div style={{ color: '#ff4444', fontSize: '12px', marginBottom: '10px' }}>
-                  Warning: Loading will fully replace all current pages.
-                </div>
-                <div style={{ display: 'flex', gap: '5px' }}>
-                  <label style={{ padding: '5px 10px', background: '#d32f2f', border: '1px solid #b71c1c', borderRadius: '4px', color: 'white', fontSize: '12px', display: 'inline-block' }}>
-                    Confirm Load
-                    <input type="file" accept=".json" onChange={(e) => { handleLoad(e); setShowLoadWarning(false); }} style={{ display: 'none' }} />
-                  </label>
-                  <button onClick={() => setShowLoadWarning(false)} style={{ padding: '5px 10px', background: '#555', border: '1px solid #777', borderRadius: '4px', color: 'white', fontSize: '12px' }}>Cancel</button>
-                </div>
-              </div>
-            )}
 
           </div>
         )
