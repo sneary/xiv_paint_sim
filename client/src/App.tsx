@@ -161,9 +161,16 @@ function App() {
       }
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    newSocket.on('disconnect', (reason) => {
+      console.log('Disconnected from server:', reason);
       setIsConnected(false);
+    });
+
+    newSocket.on('connect_error', (err) => {
+      console.error('Socket Connection Error:', err);
+      // We can set a visible error state here if needed, or rely on isConnected being false
+      // Maybe setJoinError to show it on landing page?
+      setJoinError(`Connection Error: ${err.message}`);
     });
 
     newSocket.on('stateUpdate', (newState: GameState) => {
@@ -775,9 +782,25 @@ function App() {
             padding: '10px 20px',
             borderRadius: '4px',
             color: 'white',
-            fontWeight: 'bold'
+            fontWeight: 'bold',
+            zIndex: 1000
           }}>
             {joinError}
+          </div>
+        )}
+        {!isConnected && (
+          <div style={{
+            position: 'absolute',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(255, 165, 0, 0.9)',
+            color: 'white',
+            padding: '5px 10px',
+            borderRadius: '4px',
+            fontSize: '0.8rem',
+            zIndex: 1000
+          }}>
+            ⚠ Disconnected (Reconnecting...)
           </div>
         )}
       </div>
