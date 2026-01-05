@@ -57,7 +57,8 @@ export type Action =
     | { type: 'update_stroke'; id: string; prev: Stroke; next: Stroke }
     | { type: 'update_text'; id: string; prev: TextObject; next: TextObject }
     | { type: 'delete_stroke'; prev: Stroke }
-    | { type: 'delete_text'; prev: TextObject };
+    | { type: 'delete_text'; prev: TextObject }
+    | { type: 'batch'; actions: Action[] };
 
 
 export interface GameState {

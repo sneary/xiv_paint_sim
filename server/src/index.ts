@@ -297,6 +297,73 @@ io.on('connection', (socket: Socket) => {
             }
         });
         io.to(currentRoomId).emit('stateUpdate', gs);
+        io.to(currentRoomId).emit('stateUpdate', gs);
+    });
+
+    socket.on('pasteObjects', (data: { strokes: any[], text: any[] }) => {
+        console.log('Server received pasteObjects:', data.strokes?.length, data.text?.length);
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const gs = rooms[currentRoomId];
+        const page = gs.pages[gs.currentPageIndex];
+
+        if (!page.actionHistory) page.actionHistory = [];
+        const batchActions: any[] = []; // Type issue: server Action is inferred. Using any for now or explicit Action[]
+
+        if (data.strokes) {
+            data.strokes.forEach(s => {
+                page.strokes.push(s);
+                batchActions.push({ type: 'add_stroke', id: s.id });
+            });
+        }
+        if (data.text) {
+            data.text.forEach(t => {
+                // Determine if ID collision (unlikely with new random IDs from client)
+                page.text.push(t);
+                batchActions.push({ type: 'add_text', id: t.id });
+            });
+        }
+
+        if (batchActions.length > 0) {
+            page.actionHistory.push({ type: 'batch', actions: batchActions });
+        }
+
+        io.to(currentRoomId).emit('stateUpdate', gs);
+    });
+
+    socket.on('deleteObjects', (data: { strokeIds: string[], textIds: string[] }) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const gs = rooms[currentRoomId];
+        const page = gs.pages[gs.currentPageIndex];
+
+        if (!page.actionHistory) page.actionHistory = [];
+        const batchActions: any[] = [];
+
+        if (data.strokeIds) {
+            data.strokeIds.forEach(id => {
+                const index = page.strokes.findIndex(s => s.id === id);
+                if (index !== -1) {
+                    const prev = page.strokes[index];
+                    page.strokes.splice(index, 1);
+                    batchActions.push({ type: 'delete_stroke', prev });
+                }
+            });
+        }
+        if (data.textIds) {
+            data.textIds.forEach(id => {
+                const index = page.text.findIndex(t => t.id === id);
+                if (index !== -1) {
+                    const prev = page.text[index];
+                    page.text.splice(index, 1);
+                    batchActions.push({ type: 'delete_text', prev });
+                }
+            });
+        }
+
+        if (batchActions.length > 0) {
+            page.actionHistory.push({ type: 'batch', actions: batchActions });
+        }
+
+        io.to(currentRoomId).emit('stateUpdate', gs);
     });
 
     socket.on('undo', () => {
@@ -328,6 +395,26 @@ io.on('connection', (socket: Socket) => {
             }
             else if (action?.type === 'delete_text') {
                 if (action.prev) page.text.push(action.prev);
+            } else if (action?.type === 'batch') {
+                // Reverse iterate sub-actions
+                const subActions = [...action.actions].reverse();
+                subActions.forEach(sub => {
+                    if (sub.type === 'add_stroke') {
+                        page.strokes = page.strokes.filter(s => s.id !== sub.id);
+                    } else if (sub.type === 'add_text') {
+                        page.text = page.text.filter(t => t.id !== sub.id);
+                    } else if (sub.type === 'delete_stroke') {
+                        if (sub.prev) page.strokes.push(sub.prev);
+                    } else if (sub.type === 'delete_text') {
+                        if (sub.prev) page.text.push(sub.prev);
+                    } else if (sub.type === 'update_stroke') {
+                        const index = page.strokes.findIndex(s => s.id === sub.id);
+                        if (index !== -1 && sub.prev) page.strokes[index] = sub.prev;
+                    } else if (sub.type === 'update_text') {
+                        const index = page.text.findIndex(t => t.id === sub.id);
+                        if (index !== -1 && sub.prev) page.text[index] = sub.prev;
+                    }
+                });
             }
 
             io.to(currentRoomId).emit('stateUpdate', gs);
@@ -527,6 +614,25 @@ io.on('connection', (socket: Socket) => {
 
         gs.pages.push(newPage);
         gs.currentPageIndex = gs.pages.length - 1; // Auto-switch to new page? Usually yes.
+        io.to(currentRoomId).emit('stateUpdate', gs);
+    });
+
+    socket.on('duplicatePage', () => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const gs = rooms[currentRoomId];
+        const currentPage = gs.pages[gs.currentPageIndex];
+
+        // Deep copy the current page
+        const newPage = JSON.parse(JSON.stringify(currentPage));
+
+        // Assign new ID and reset ephemeral state
+        newPage.id = Math.random().toString(36).substr(2, 9);
+        newPage.actionHistory = []; // Start fresh history for the new page
+
+        // Insert after current page
+        gs.pages.splice(gs.currentPageIndex + 1, 0, newPage);
+        gs.currentPageIndex += 1; // Switch to the new page
+
         io.to(currentRoomId).emit('stateUpdate', gs);
     });
 

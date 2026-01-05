@@ -6,6 +6,7 @@ interface PageControlsProps {
     currentPageIndex: number;
     onChangePage: (index: number) => void;
     onAddPage: () => void;
+    onDuplicatePage: () => void;
     onDeletePage: () => void;
 }
 
@@ -14,6 +15,7 @@ const PageControls: React.FC<PageControlsProps> = ({
     currentPageIndex,
     onChangePage,
     onAddPage,
+    onDuplicatePage,
     onDeletePage
 }) => {
     return (
@@ -110,6 +112,35 @@ const PageControls: React.FC<PageControlsProps> = ({
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00ff00" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+
+            {/* Duplicate Page */}
+            <button
+                onClick={onDuplicatePage}
+                title="Duplicate Current Page"
+                style={{
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '36px',
+                    height: '36px',
+                    padding: 0,
+                }}
+            >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    {/* Green Plus (Top Left, scaled down) */}
+                    <g transform="scale(0.7) translate(-2, -2)">
+                        <path d="M12 5V19M5 12H19" stroke="#00ff00" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                    </g>
+                    {/* Copy Icon (Bottom Right, White) */}
+                    <g transform="translate(8, 8) scale(0.65)">
+                        <rect x="9" y="9" width="13" height="13" rx="2" ry="2" stroke="white" strokeWidth="2.5" fill="none"></rect>
+                        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"></path>
+                    </g>
                 </svg>
             </button>
 

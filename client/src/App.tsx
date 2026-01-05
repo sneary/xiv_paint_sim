@@ -12,9 +12,12 @@ import DebuffMenu from './components/DebuffMenu';
 import WaymarkMenu from './components/WaymarkMenu';
 import CollapsibleSection from './components/CollapsibleSection';
 import PageControls from './components/PageControls';
+import Credits from './components/Credits';
 
 // In production, we connect DIRECTLY to Cloud Run to bypass Firebase Hosting proxy latency.
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (import.meta.env.PROD ? 'https://xiv-paint-sim-366274758228.us-south1.run.app' : 'http://localhost:3001');
+// CHECK: If running locally (localhost), use localhost even if built in PROD mode.
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || ((import.meta.env.PROD && !isLocal) ? 'https://xiv-paint-sim-366274758228.us-south1.run.app' : 'http://localhost:3001');
 
 function App() {
   const [gameState, setGameState] = useState<GameState>({
@@ -322,6 +325,10 @@ function App() {
     socketRef.current?.emit('addPage');
   };
 
+  const handleDuplicatePage = () => {
+    socketRef.current?.emit('duplicatePage');
+  };
+
   const handleDeletePage = () => {
     socketRef.current?.emit('deletePage');
   };
@@ -505,6 +512,10 @@ function App() {
   const [lineWidth, setLineWidth] = useState<number>(3);
   const [tool, setTool] = useState<'select' | 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone' | 'rect'>('brush');
   const [showLoadWarning, setShowLoadWarning] = useState<boolean>(false);
+
+  // Clipboard & Shortcuts
+  const [clipboard, setClipboard] = useState<{ strokes: Stroke[], text: TextObject[] } | null>(null);
+  const mousePosRef = useRef<{ x: number, y: number } | null>(null);
 
   // Clear text input and selection when tool changes
   useEffect(() => {
@@ -709,6 +720,7 @@ function App() {
   };
 
   const moveStroke = (x: number, y: number) => {
+    mousePosRef.current = { x, y };
     // Selection Tool Logic
     if (tool === 'select') {
       if (isDraggingSelectionRef.current && dragStartRef.current) {
@@ -1056,6 +1068,120 @@ function App() {
     // ... cleanup?
   }, []);
 
+  // Ref pattern to access latest state in event listeners without re-binding
+  const stateRef = useRef({
+    gameState,
+    selectedIds,
+    textInput,
+    clipboard,
+    mousePos: mousePosRef.current
+  });
+
+  // Update ref on every render
+  useEffect(() => {
+    stateRef.current = {
+      gameState,
+      selectedIds,
+      textInput,
+      clipboard,
+      mousePos: mousePosRef.current
+    };
+  });
+
+  // Keyboard Shortcuts (Bound once)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const { gameState, selectedIds, textInput, clipboard } = stateRef.current;
+
+      console.log('Global KeyDown (Ref):', e.key, 'Ctrl:', e.ctrlKey || e.metaKey, 'Selected:', selectedIds.length);
+
+      // Ignore if typing in text input (DOM check)
+      if (document.activeElement instanceof HTMLInputElement || document.activeElement instanceof HTMLTextAreaElement) return;
+      // Also ignore if internal text input state is active
+      if (textInput) return;
+
+      // Delete
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedIds.length > 0) {
+          console.log('Delete Triggered. Items:', selectedIds.length);
+          const page = gameState.pages[gameState.currentPageIndex];
+          const strokeIds = page.strokes.filter(s => selectedIds.includes(s.id)).map(s => s.id);
+          const textIds = page.text.filter(t => selectedIds.includes(t.id)).map(t => t.id);
+
+          if (strokeIds.length > 0 || textIds.length > 0) {
+            socketRef.current?.emit('deleteObjects', { strokeIds, textIds });
+            setSelectedIds([]);
+          }
+        }
+      }
+
+      // Copy
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        if (selectedIds.length > 0) {
+          console.log('Copy Triggered. Items:', selectedIds.length);
+          const page = gameState.pages[gameState.currentPageIndex];
+          const strokes = page.strokes.filter(s => selectedIds.includes(s.id)).map(s => JSON.parse(JSON.stringify(s)));
+          const text = page.text.filter(t => selectedIds.includes(t.id)).map(t => JSON.parse(JSON.stringify(t)));
+          setClipboard({ strokes, text });
+        }
+      }
+
+      // Paste
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        const currentMouse = mousePosRef.current; // Use direct ref for mouse to be safest
+        console.log('Paste Triggered. Clipboard:', !!clipboard, 'Mouse:', currentMouse);
+
+        if (clipboard && currentMouse) {
+          const { x: mx, y: my } = currentMouse;
+          // Calculate center of clipboard items
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+          clipboard.strokes.forEach(s => {
+            s.points.forEach(p => {
+              if (p.x < minX) minX = p.x;
+              if (p.x > maxX) maxX = p.x;
+              if (p.y < minY) minY = p.y;
+              if (p.y > maxY) maxY = p.y;
+            });
+          });
+          clipboard.text.forEach(t => {
+            if (t.x < minX) minX = t.x;
+            if (t.x > maxX) maxX = t.x;
+            if (t.y < minY) minY = t.y;
+            if (t.y > maxY) maxY = t.y;
+          });
+
+          if (minX !== Infinity) {
+            const cx = (minX + maxX) / 2;
+            const cy = (minY + maxY) / 2;
+            const dx = mx - cx;
+            const dy = my - cy;
+
+            // Prepare new items with new IDs and offset
+            const newStrokes = clipboard.strokes.map(s => ({
+              ...s,
+              id: Math.random().toString(36).substr(2, 9),
+              points: s.points.map(p => ({ x: p.x + dx, y: p.y + dy }))
+            }));
+            const newText = clipboard.text.map(t => ({
+              ...t,
+              id: Math.random().toString(36).substr(2, 9),
+              x: t.x + dx,
+              y: t.y + dy
+            }));
+
+            socketRef.current?.emit('pasteObjects', { strokes: newStrokes, text: newText });
+            setSelectedIds([...newStrokes.map(s => s.id), ...newText.map(t => t.id)]);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []); // Empty dependency array = Bound ONCE
+
+
   if (!isJoined) {
     return (
       <div className="app-container">
@@ -1154,7 +1280,7 @@ function App() {
         onClick={() => setMuteHonks(!muteHonks)}
         style={{
           position: 'absolute',
-          bottom: 20,
+          bottom: 80,
           right: 20,
           width: 44,
           height: 44,
@@ -1696,11 +1822,13 @@ function App() {
             pages={gameState.pages}
             currentPageIndex={gameState.currentPageIndex}
             onAddPage={handleAddPage}
+            onDuplicatePage={handleDuplicatePage}
             onDeletePage={handleDeletePage}
             onChangePage={handleChangePage}
           />
         )
       }
+      <Credits />
 
     </div >
   );

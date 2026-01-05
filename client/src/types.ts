@@ -47,8 +47,17 @@ export interface Page {
     strokes: Stroke[];
     markers: Record<string, Point>;
     text: TextObject[];
-    actionHistory?: string[];
+    actionHistory?: Action[];
 }
+
+export type Action =
+    | { type: 'add_stroke'; id: string }
+    | { type: 'add_text'; id: string }
+    | { type: 'update_stroke'; id: string; prev: Stroke; next: Stroke }
+    | { type: 'update_text'; id: string; prev: TextObject; next: TextObject }
+    | { type: 'delete_stroke'; prev: Stroke }
+    | { type: 'delete_text'; prev: TextObject }
+    | { type: 'batch'; actions: Action[] };
 
 export interface GameState {
     players: Record<string, Player>;

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './LandingPage.css';
+import Credits from './Credits';
 
 interface LandingPageProps {
     onJoin: (data: { action: 'create' | 'join', roomId?: string, name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => void;
@@ -78,6 +79,20 @@ const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId, isLoa
         }
     }, [name, takenNames, mode]);
 
+    // Ref for automation compatibility
+    const nameInputRef = useRef<HTMLInputElement>(null);
+
+    // Automation Compatibility: Sync input value to state if it was set programmatically without events
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (nameInputRef.current && nameInputRef.current.value !== name) {
+                // If the DOM value differs from React state (e.g. automation set .value), sync it
+                setName(nameInputRef.current.value);
+            }
+        }, 200);
+        return () => clearInterval(interval);
+    }, [name]);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -103,7 +118,6 @@ const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId, isLoa
                 setError('Name is taken.');
                 return;
             }
-
             if (selectedRole !== 'spectator') {
                 if (takenColors.includes(selectedColor)) {
                     setError('Color is taken.');
@@ -187,6 +201,7 @@ const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId, isLoa
                             <div className="form-group">
                                 <label className="form-label">Character Name</label>
                                 <input
+                                    ref={nameInputRef}
                                     className="input-field"
                                     type="text"
                                     value={name}
@@ -291,6 +306,7 @@ const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId, isLoa
                     </div>
                 </div>
             </div>
+            <Credits />
         </>
     );
 };
