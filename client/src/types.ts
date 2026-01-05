@@ -38,7 +38,6 @@ export interface ArenaConfig {
     width: number;
     height: number;
     showGrid?: boolean;
-    muteHonks?: boolean;
     waymarkPreset?: string;
 }
 

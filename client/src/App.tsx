@@ -110,7 +110,6 @@ function App() {
   // Honk State
   const [honkingPlayers, setHonkingPlayers] = useState<Record<string, number>>({});
 
-
   // Socket Events
   useEffect(() => {
     // If we have a socket already, don't recreate unless URL changed (it won't)
@@ -203,9 +202,8 @@ function App() {
       // Trigger visual effect
       setHonkingPlayers(prev => ({ ...prev, [id]: Date.now() }));
 
-      // Check for mute setting from current page config
-      const currentPage = gameStateRef.current.pages[gameStateRef.current.currentPageIndex];
-      if (!currentPage?.config?.muteHonks) {
+      // Check mute state from ref
+      if (!muteHonksRef.current) {
         playHonkSound();
       }
 
@@ -793,29 +791,15 @@ function App() {
           <div style={{ position: 'absolute', top: 60, left: 10, zIndex: 120, transform: 'scale(0.9)', transformOrigin: 'top left' }}>
             <div style={{ position: 'relative' }}>
               <ConfigMenu
-                config={currentPage.config}
+                config={gameState.pages[gameState.currentPageIndex].config}
                 onUpdate={handleConfigUpdate}
                 onSetDebuffs={() => setShowDebuffMenu(true)}
-                onClearDebuffs={() => {
-                  if (socketRef.current) {
-                    const updates: Record<string, number[]> = {};
-                    Object.keys(gameState.players).forEach(id => {
-                      updates[id] = [];
-                    });
-                    socketRef.current.emit('updateDebuffs', updates);
-                  }
-                }}
-                onLimitCut={() => {
-                  if (socketRef.current) {
-                    socketRef.current.emit('limitCut');
-                  }
-                }}
-                onClearLimitCut={() => {
-                  if (socketRef.current) {
-                    socketRef.current.emit('clearLimitCut');
-                  }
-                }}
+                onClearDebuffs={handleClearDebuffs}
+                onLimitCut={handleLimitCut}
+                onClearLimitCut={handleClearLimitCut}
                 onClose={() => setShowConfig(false)}
+                muteHonks={muteHonks}
+                onToggleMuteHonks={setMuteHonks}
               />
             </div>
           </div>
