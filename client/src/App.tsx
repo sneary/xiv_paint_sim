@@ -1165,7 +1165,7 @@ function App() {
             {/* Tools Section */}
             <div style={{ gridArea: 'tools' }}>
               <CollapsibleSection
-                title="Tools"
+                title={`Tools${tool ? ` (${tool.charAt(0).toUpperCase() + tool.slice(1)})` : ''}`}
                 isOpen={isToolsOpen}
                 onToggle={() => setIsToolsOpen(!isToolsOpen)}
               >
@@ -1211,7 +1211,7 @@ function App() {
             {/* Waymarks Section (Universal) */}
             <div style={{ gridArea: 'waymarks' }}>
               <CollapsibleSection
-                title="Waymarks"
+                title={`Waymarks${activeMarker ? ` (${activeMarker})` : ''}`}
                 isOpen={isWaymarksOpen}
                 onToggle={() => setIsWaymarksOpen(!isWaymarksOpen)}
               >
