@@ -1163,13 +1163,13 @@ function App() {
             </div>
 
             {/* Tools Section */}
-            <div style={{ gridArea: 'tools' }}>
+            <div style={{ gridArea: 'tools', ...(isMobile ? { maxWidth: '210px' } : {}) }}>
               <CollapsibleSection
                 title={`Tools${tool ? ` (${tool.charAt(0).toUpperCase() + tool.slice(1)})` : ''}`}
                 isOpen={isToolsOpen}
                 onToggle={() => setIsToolsOpen(!isToolsOpen)}
               >
-                <div className="tool-grid" style={isMobile ? { maxWidth: '210px', margin: 0 } : {}}>
+                <div className="tool-grid" style={isMobile ? { margin: 0 } : {}}>
                   {['brush', 'eraser', 'line', 'donut', 'circle', 'text', 'cone'].map(t => (
                     <button
                       key={t}
@@ -1209,13 +1209,13 @@ function App() {
             </div>
 
             {/* Waymarks Section (Universal) */}
-            <div style={{ gridArea: 'waymarks' }}>
+            <div style={{ gridArea: 'waymarks', ...(isMobile ? { maxWidth: '210px' } : {}) }}>
               <CollapsibleSection
                 title={`Waymarks${activeMarker ? ` (${activeMarker})` : ''}`}
                 isOpen={isWaymarksOpen}
                 onToggle={() => setIsWaymarksOpen(!isWaymarksOpen)}
               >
-                <div style={isMobile ? { maxWidth: '210px', margin: 0 } : {}}>
+                <div style={isMobile ? { margin: 0 } : {}}>
                   <WaymarkMenu
                     activeMarker={activeMarker}
                     onSelect={(m) => {
