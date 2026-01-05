@@ -4,6 +4,8 @@ import './LandingPage.css';
 interface LandingPageProps {
     onJoin: (data: { action: 'create' | 'join', roomId?: string, name: string, color: number, role: 'tank' | 'healer' | 'dps' | 'spectator' }) => void;
     onCheckRoom: (roomId: string) => Promise<{ exists: boolean, takenNames: string[], takenColors: number[] }>;
+    isConnected?: boolean;
+    socketId?: string;
 }
 
 const COLORS = [
@@ -11,7 +13,7 @@ const COLORS = [
     0xff00ff, 0x00ffff, 0xffffff, 0xCC5500
 ];
 
-const LandingPage = ({ onJoin, onCheckRoom }: LandingPageProps) => {
+const LandingPage = ({ onJoin, onCheckRoom, isConnected = false, socketId }: LandingPageProps) => {
 
     const [mode, setMode] = useState<'create' | 'join'>('create');
     const [roomId, setRoomId] = useState('');
@@ -271,11 +273,20 @@ const LandingPage = ({ onJoin, onCheckRoom }: LandingPageProps) => {
                             <button
                                 className="join-button"
                                 type="submit"
-                                disabled={!name.trim() || (mode === 'join' && roomId.length !== 4)}
+                                disabled={!name.trim() || (mode === 'join' && roomId.length !== 4) || !isConnected}
+                                style={{
+                                    opacity: !isConnected ? 0.7 : 1,
+                                    cursor: !isConnected ? 'not-allowed' : 'pointer'
+                                }}
                             >
-                                {isSpectator ? 'Watch Game' : (mode === 'create' ? 'Create Room' : 'Join Room')}
+                                {!isConnected ? 'Connecting...' : (isSpectator ? 'Watch Game' : (mode === 'create' ? 'Create Room' : 'Join Room'))}
                             </button>
                         </form>
+
+                        <div style={{ marginTop: '20px', fontSize: '0.7rem', color: '#666', textAlign: 'center' }}>
+                            Status: {isConnected ? <span style={{ color: '#4caf50' }}>Connected</span> : <span style={{ color: '#f44336' }}>Disconnected</span>}
+                            {socketId && <span style={{ marginLeft: '10px', opacity: 0.5 }}>ID: {socketId.slice(0, 4)}...</span>}
+                        </div>
                     </div>
                 </div>
             </div>

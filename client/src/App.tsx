@@ -141,15 +141,18 @@ function App() {
   useEffect(() => {
     // If we have a socket already, don't recreate unless URL changed (it won't)
     // Actually, simple way: Just create one socket.
+    // Use polling AND websocket for better reliability on Cloud Run / Firebase cold starts
     const newSocket = io(SOCKET_URL, {
-      transports: ['websocket'],
-      upgrade: false
+      transports: ['polling', 'websocket'],
+      upgrade: true,
+      reconnectionAttempts: 5
     });
     socketRef.current = newSocket;
 
     newSocket.on('connect', () => {
-      console.log('Connected to server');
+      console.log('Connected to server via', newSocket.io.engine.transport.name);
       setIsConnected(true);
+      setJoinError(''); // Clear error on connect
 
       // Auto-rejoin if we were previously in a game
       if (lastJoinOptions.current) {
@@ -771,6 +774,8 @@ function App() {
         <LandingPage
           onJoin={handleJoin}
           onCheckRoom={handleCheckRoom}
+          isConnected={isConnected}
+          socketId={socketRef.current?.id}
         />
         {joinError && (
           <div style={{
