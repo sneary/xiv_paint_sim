@@ -1169,7 +1169,7 @@ function App() {
                 isOpen={isToolsOpen}
                 onToggle={() => setIsToolsOpen(!isToolsOpen)}
               >
-                <div className="tool-grid">
+                <div className="tool-grid" style={isMobile ? { maxWidth: '216px' } : {}}>
                   {['brush', 'eraser', 'line', 'donut', 'circle', 'text', 'cone'].map(t => (
                     <button
                       key={t}
@@ -1179,7 +1179,7 @@ function App() {
                         if (isMobile) setIsToolsOpen(false); // Only collapse Tools section
                       }}
                     >
-                      {t.charAt(0).toUpperCase() + t.slice(1)}
+                      {t === 'cone' ? 'Cone' : t.charAt(0).toUpperCase() + t.slice(1)}
                     </button>
                   ))}
                   <button className="tool-button warning" onClick={() => socketRef.current?.emit('undoStroke')}>Undo</button>
@@ -1215,17 +1215,19 @@ function App() {
                 isOpen={isWaymarksOpen}
                 onToggle={() => setIsWaymarksOpen(!isWaymarksOpen)}
               >
-                <WaymarkMenu
-                  activeMarker={activeMarker}
-                  onSelect={(m) => {
-                    setActiveMarker(m);
-                    if (m) {
-                      setTool('brush');
-                      if (isMobile) setIsWaymarksOpen(false); // Only collapse Waymarks section
-                    }
-                  }}
-                  onClearAll={() => socketRef.current?.emit('clearMarkers')}
-                />
+                <div style={isMobile ? { maxWidth: '216px' } : {}}>
+                  <WaymarkMenu
+                    activeMarker={activeMarker}
+                    onSelect={(m) => {
+                      setActiveMarker(m);
+                      if (m) {
+                        setTool('brush');
+                        if (isMobile) setIsWaymarksOpen(false); // Only collapse Waymarks section
+                      }
+                    }}
+                    onClearAll={() => socketRef.current?.emit('clearMarkers')}
+                  />
+                </div>
               </CollapsibleSection>
             </div>
 
