@@ -142,6 +142,17 @@ function App() {
     socketRef.current?.emit('clearLimitCut');
   };
 
+  const handleCopyRoomId = () => {
+    if (roomId) {
+      navigator.clipboard.writeText(roomId).then(() => {
+        // Optional: Visual feedback could be added here
+        // For now, relying on user action
+      }).catch(err => {
+        console.error('Failed to copy room ID', err);
+      });
+    }
+  };
+
   // Socket Events
   useEffect(() => {
     // If we have a socket already, don't recreate unless URL changed (it won't)
@@ -992,16 +1003,20 @@ function App() {
 
         {/* Room Code */}
         {roomId && (
-          <div style={{
-            display: 'flex', alignItems: 'center', // Ensure vertical alignment
-            color: '#fff',
-            fontSize: '13px', // Restored font size
-            fontFamily: 'sans-serif',
-            borderLeft: '1px solid #666',
-            paddingLeft: '12px', // Restored padding
-            height: '100%', // Full height for alignment
-            letterSpacing: '0.5px'
-          }}>
+          <div
+            onClick={handleCopyRoomId}
+            title="Copy Room Code"
+            style={{
+              display: 'flex', alignItems: 'center', // Ensure vertical alignment
+              color: '#fff',
+              fontSize: '13px', // Restored font size
+              fontFamily: 'sans-serif',
+              borderLeft: '1px solid #666',
+              paddingLeft: '12px', // Restored padding
+              height: '100%', // Full height for alignment
+              letterSpacing: '0.5px',
+              cursor: 'pointer'
+            }}>
             Room: {roomId}
           </div>
         )}
@@ -1240,7 +1255,19 @@ function App() {
       {!isMobile && <h1 style={{ color: '#eee', fontFamily: 'sans-serif', marginBottom: '1rem' }}>XIV Paint Sim</h1>}
 
       <div style={{ color: '#aaa', marginBottom: '1rem', fontSize: isMobile ? '0.8rem' : '1rem' }}>
-        {myId ? `Connected as ${gameState.players[myId]?.name || myId} (Room: ${roomId})` : 'Connecting...'}
+        {myId ? (
+          <>
+            Connected as {gameState.players[myId]?.name || myId}
+            {' '}
+            <span
+              onClick={handleCopyRoomId}
+              title="Copy Room Code"
+              style={{ cursor: 'pointer', textDecoration: 'underline', color: '#fff' }}
+            >
+              (Room: {roomId})
+            </span>
+          </>
+        ) : 'Connecting...'}
         {!isMobile && <><br />Use W/A/S/D to move. Press Space to Honk. Click and drag in arena to paint.</>}
       </div>
 
