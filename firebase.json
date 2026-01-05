@@ -11,7 +11,7 @@
                 "source": "**",
                 "run": {
                     "serviceId": "xiv-paint-sim",
-                    "region": "northamerica-northeast1"
+                    "region": "us-south1"
                 }
             }
         ]
