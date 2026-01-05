@@ -1019,7 +1019,7 @@ function App() {
             zIndex: 100,
             maxHeight: '90vh',
             overflowY: 'auto',
-            width: isMobile ? '320px' : '230px',
+            width: isMobile ? '265px' : '230px',
             overflowX: 'hidden',
             display: 'grid',
             gap: '10px',
