@@ -178,21 +178,21 @@ function App() {
     // Actually, simple way: Just create one socket.
     // Use polling AND websocket for better reliability on Cloud Run / Firebase cold starts
     const newSocket = io(SOCKET_URL, {
-      transports: ['polling', 'websocket'],
-      upgrade: true,
-      reconnectionAttempts: 5
+      transports: ['websocket', 'polling'], // Prefer WebSocket
+      reconnectionAttempts: 20,
+      reconnectionDelay: 1000,
+      reconnection: true,
+      timeout: 20000
     });
     socketRef.current = newSocket;
 
     newSocket.on('connect', () => {
-      console.log('Connected to server via', newSocket.io.engine.transport.name);
+      console.log('Connected to server:', newSocket.id);
       setIsConnected(true);
-      setJoinError(''); // Clear error on connect
 
       // Auto-rejoin if we were previously in a game
       if (lastJoinOptions.current) {
         console.log('Auto-rejoining game...');
-        // Add a small delay to ensure server is ready or to avoid race conditions
         setTimeout(() => {
           newSocket.emit('joinGame', lastJoinOptions.current);
         }, 100);
@@ -206,20 +206,22 @@ function App() {
 
     newSocket.on('connect_error', (err) => {
       console.error('Socket Connection Error:', err);
-      // We can set a visible error state here if needed, or rely on isConnected being false
-      // Maybe setJoinError to show it on landing page?
       setJoinError(`Connection Error: ${err.message}`);
     });
 
     newSocket.on('chatMessage', (msg: ChatMessage) => {
-      setChatMessages(prev => [...prev, msg].slice(-50)); // Keep last 50
+      setChatMessages(prev => [...prev, msg].slice(-50));
     });
 
     newSocket.on('stateUpdate', (newState: GameState) => {
-      // Merge logic... for now just set
-      // Preserve local physics if we are moving?
-      // Actually we trust server state for position usually, but interpolate.
-      // For simplified sim, just set.
+      // Client-Side Authority:
+      // If we are playing, IGNORE server's position for US.
+      // We trust our local simulation.
+      if (newSocket.id && newState.players[newSocket.id] && localPlayerRef.current) {
+        // Keep our local position, but accept other data (role, color, etc)
+        newState.players[newSocket.id].x = localPlayerRef.current.x;
+        newState.players[newSocket.id].y = localPlayerRef.current.y;
+      }
       setGameState(newState);
       if (newState.chatHistory) {
         setChatMessages(newState.chatHistory);
