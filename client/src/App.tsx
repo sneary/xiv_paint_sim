@@ -80,29 +80,53 @@ function App() {
   // Helper to safely get current page
   // Helper to safely get current page (unused, removed)
 
+  // Fix Mobile Scroll/Drift
   useEffect(() => {
+    const handleScrollReset = () => {
+      if (window.scrollY !== 0 || window.scrollX !== 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+
     const handleResize = () => {
+      // ... existing resize logic ...
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
-      // Default to shown on desktop, but allow closing
       if (showConfig === undefined) setShowConfig(true);
       if (showTools === undefined) setShowTools(true);
 
-      // Calculate Scale
-      // Base size is 800x600.
-      // We want some padding.
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      // Reduce buffer on mobile to maximize size
+      // Recalc Scale
+      const w = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+      const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      // Reduce buffer on mobile
       const hBuffer = mobile ? 20 : 50;
       const s = Math.min(w / 800, (h - hBuffer) / 600);
       setScale(s < 1 ? s : 1);
+
+      // Force scroll reset
+      handleScrollReset();
     };
 
     window.addEventListener('resize', handleResize);
+    window.addEventListener('scroll', handleScrollReset);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('scroll', handleScrollReset);
+    }
+
     handleResize(); // Init
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('scroll', handleScrollReset);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleScrollReset);
+      }
+    };
+  }, [showConfig, showTools]);
+
+
 
 
 
