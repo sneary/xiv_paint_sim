@@ -47,7 +47,7 @@ const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, isMobile }) => {
             right: isMobile ? '5px' : 'auto', // Closer to edge
             width: isMobile ? (isMinimized ? '40px' : '180px') : (isMinimized ? '40px' : '300px'), // Collapsed width
             height: isMinimized ? '40px' : 'auto',
-            maxHeight: isMinimized ? '40px' : '200px',
+            maxHeight: isMinimized ? '40px' : (isMobile ? '100px' : '200px'),
             display: 'flex',
             flexDirection: 'column',
             backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -91,7 +91,7 @@ const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, isMobile }) => {
                         overflowY: 'auto',
                         marginBottom: '8px',
                         color: 'white',
-                        fontSize: '0.9rem',
+                        fontSize: isMobile ? '0.75rem' : '0.9rem',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '4px'
@@ -129,7 +129,7 @@ const Chat: React.FC<ChatProps> = ({ messages, onSendMessage, isMobile }) => {
                                 borderRadius: '4px',
                                 color: 'white',
                                 padding: '4px 8px',
-                                fontSize: '0.9rem'
+                                fontSize: isMobile ? '0.75rem' : '0.9rem'
                             }}
                             onFocus={(e) => {
                                 // Prevent game inputs
