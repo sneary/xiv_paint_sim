@@ -16,7 +16,10 @@ const io = new Server(server, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    pingTimeout: 60000, // 60s timeout (default 20s is too sensitive)
+    pingInterval: 25000, // 25s ping
+    transports: ['websocket', 'polling'] // Allow both, but prefer WS
 });
 
 import { GameState, initialState, ArenaConfig } from './state';
