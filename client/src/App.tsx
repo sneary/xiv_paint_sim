@@ -81,15 +81,10 @@ function App() {
   // Helper to safely get current page (unused, removed)
 
   // Fix Mobile Scroll/Drift
+  // Fix Mobile Scroll/Drift
   useEffect(() => {
-    const handleScrollReset = () => {
-      if (window.scrollY !== 0 || window.scrollX !== 0) {
-        window.scrollTo(0, 0);
-      }
-    };
-
+    // Only handle resize for scaling, do NOT force scroll reset loop
     const handleResize = () => {
-      // ... existing resize logic ...
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
       if (showConfig === undefined) setShowConfig(true);
@@ -98,30 +93,22 @@ function App() {
       // Recalc Scale
       const w = window.visualViewport ? window.visualViewport.width : window.innerWidth;
       const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      // Reduce buffer on mobile
       const hBuffer = mobile ? 20 : 50;
       const s = Math.min(w / 800, (h - hBuffer) / 600);
       setScale(s < 1 ? s : 1);
-
-      // Force scroll reset
-      handleScrollReset();
     };
 
     window.addEventListener('resize', handleResize);
-    window.addEventListener('scroll', handleScrollReset);
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleResize);
-      window.visualViewport.addEventListener('scroll', handleScrollReset);
     }
 
     handleResize(); // Init
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('scroll', handleScrollReset);
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleResize);
-        window.visualViewport.removeEventListener('scroll', handleScrollReset);
       }
     };
   }, [showConfig, showTools]);
