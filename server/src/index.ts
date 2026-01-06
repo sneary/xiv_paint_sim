@@ -25,8 +25,10 @@ const io = new Server(server, {
 import { GameState, initialState, ArenaConfig } from './state';
 
 // Room State Management
+// Room State Management
 const rooms: Record<string, GameState> = {};
 const roomDeletionTimers: Record<string, NodeJS.Timeout> = {};
+const roomPlayerActivity: Record<string, number> = {}; // Key: "roomId:playerName", Value: lastActiveTimestamp
 
 function generateRoomId(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -57,20 +59,34 @@ io.on('connection', (socket: Socket) => {
 
     // Update activity on ANY event
     socket.onAny(() => {
-        socket.data.lastActive = Date.now();
+        const now = Date.now();
+        socket.data.lastActive = now;
+
+        // Update persistent map if user is in a room (we need to know their name/room)
+        // Unfortunately onAny doesn't easy give us access to 'name' unless we stored it on socket
+        // But we DO store roomId on socket! We just need name.
+        if (currentRoomId && socket.data.name) { // We'll add name to socket.data in joinGame
+            roomPlayerActivity[`${currentRoomId}:${socket.data.name}`] = now;
+        }
+
         if (socket.data.warningStage !== 0) {
             // Reset warnings if they became active
             socket.data.warningStage = 0;
-            // Optional: specific "Welcome back" message? keeping it silent is better.
         }
     });
+
+    // Persistent AFK Tracking (Room:Name -> LastActive Timestamp)
+    // This ensures disconnects don't reset the timer.
+    const afkPersistence: Record<string, number> = {};
 
     socket.on('joinGame', (data: {
         action: 'create' | 'join',
         roomId?: string,
         name: string,
         color: number,
-        role: 'tank' | 'healer' | 'dps' | 'spectator'
+        role: 'tank' | 'healer' | 'dps' | 'spectator',
+        x?: number,
+        y?: number
     }) => {
         let roomId = data.roomId?.toUpperCase();
 
@@ -117,12 +133,25 @@ io.on('connection', (socket: Socket) => {
         // Success - Join Room
         currentRoomId = roomId!;
         socket.join(currentRoomId);
+        socket.data.name = data.name; // Store for AFK tracking
+
+        // AFK Persistence Logic
+        const userKey = `${currentRoomId}:${data.name}`;
+        if (roomPlayerActivity[userKey]) {
+            // Restore previous activity time (don't reset to now)
+            socket.data.lastActive = roomPlayerActivity[userKey];
+        } else {
+            // New user or expired
+            socket.data.lastActive = Date.now();
+            roomPlayerActivity[userKey] = Date.now();
+        }
 
         // Add Player
         gameState.players[socket.id] = {
             id: socket.id,
-            x: 400,
-            y: 300,
+            // Seamless Reconnect: Use provided position if available (and valid-ish), else default
+            x: (data.x !== undefined && data.y !== undefined) ? data.x : 400,
+            y: (data.x !== undefined && data.y !== undefined) ? data.y : 300,
             color: data.color || 0xffffff,
             name: data.name,
             role: data.role || 'dps',

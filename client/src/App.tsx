@@ -329,7 +329,14 @@ function App() {
       setIsProcessing(true);
       setJoinError(''); // Clear previous errors
 
-      socketRef.current.emit('joinGame', data);
+      // Seamless Reconnect: Send our last known local position if available
+      const payload: any = { ...data };
+      if (localPlayerRef.current) {
+        payload.x = localPlayerRef.current.x;
+        payload.y = localPlayerRef.current.y;
+      }
+
+      socketRef.current.emit('joinGame', payload);
       lastJoinOptions.current = data;
 
       // Timeout Safety Net
