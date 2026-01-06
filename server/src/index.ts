@@ -444,6 +444,10 @@ io.on('connection', (socket: Socket) => {
                     gs.currentPageIndex = typeof savedState.currentPageIndex === 'number' ? savedState.currentPageIndex : 0;
                 }
             }
+            // Ensure chatHistory is initialized if not present in savedState
+            if (!gs.chatHistory) {
+                gs.chatHistory = [];
+            }
             io.to(currentRoomId).emit('stateUpdate', gs);
         }
     });
@@ -634,6 +638,29 @@ io.on('connection', (socket: Socket) => {
         gs.currentPageIndex += 1; // Switch to the new page
 
         io.to(currentRoomId).emit('stateUpdate', gs);
+    });
+
+    socket.on('sendChat', (text: string) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const gs = rooms[currentRoomId];
+        const player = gs.players[socket.id];
+
+        if (!player || !text.trim()) return;
+
+        const message = {
+            id: Math.random().toString(36).substr(2, 9),
+            sender: player.name,
+            text: text.trim(),
+            color: player.color, // Use player's color
+            timestamp: Date.now()
+        };
+
+        // Add to history (Limit 50)
+        gs.chatHistory.push(message);
+        if (gs.chatHistory.length > 50) gs.chatHistory.shift();
+
+        // Broadcast JUST the message for performance
+        io.to(currentRoomId).emit('chatMessage', message);
     });
 
     socket.on('deletePage', () => {

@@ -13,6 +13,8 @@ import WaymarkMenu from './components/WaymarkMenu';
 import CollapsibleSection from './components/CollapsibleSection';
 import PageControls from './components/PageControls';
 import Credits from './components/Credits';
+import Chat from './components/Chat';
+import type { ChatMessage } from './types';
 
 // In production, we connect DIRECTLY to Cloud Run to bypass Firebase Hosting proxy latency.
 // CHECK: If running locally (localhost), use localhost even if built in PROD mode.
@@ -29,7 +31,8 @@ function App() {
       strokes: [],
       markers: {},
       text: []
-    }]
+    }],
+    chatHistory: []
   });
   const socketRef = useRef<Socket | null>(null);
   const [isJoined, setIsJoined] = useState(false);
@@ -71,6 +74,7 @@ function App() {
   const [isToolsOpen, setIsToolsOpen] = useState(!isMobile);
   const [isWaymarksOpen, setIsWaymarksOpen] = useState(false);
 
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [scale, setScale] = useState(1);
 
   // Helper to safely get current page
@@ -196,8 +200,19 @@ function App() {
       setJoinError(`Connection Error: ${err.message}`);
     });
 
+    newSocket.on('chatMessage', (msg: ChatMessage) => {
+      setChatMessages(prev => [...prev, msg].slice(-50)); // Keep last 50
+    });
+
     newSocket.on('stateUpdate', (newState: GameState) => {
+      // Merge logic... for now just set
+      // Preserve local physics if we are moving?
+      // Actually we trust server state for position usually, but interpolate.
+      // For simplified sim, just set.
       setGameState(newState);
+      if (newState.chatHistory) {
+        setChatMessages(newState.chatHistory);
+      }
     });
 
     newSocket.on('playerMoved', (data: { id: string, x: number, y: number }) => {
@@ -1275,12 +1290,49 @@ function App() {
         )
       }
 
+      {/* Floating Honk Button (Left of Mute) */}
+      <div
+        onClick={() => {
+          // Trigger visual feedback?
+          // Just emit event
+          socketRef.current?.emit('honk');
+        }}
+        style={{
+          position: 'absolute',
+          bottom: isMobile ? 70 : 80, // Match Mute button
+          right: 75, // 20 (Mute) + 44 (Width) + 11 (Gap)
+          width: 44,
+          height: 44,
+          borderRadius: '50%',
+          backgroundColor: 'rgba(20, 20, 25, 0.8)',
+          border: '1px solid rgba(255, 255, 255, 0.15)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          zIndex: 1000,
+          color: '#fff',
+          boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
+          transition: 'all 0.2s ease'
+        }}
+        title="Honk!"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+          {/* Mouthpiece */}
+          <path d="M4 8a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1z"></path>
+          {/* Body & Bell */}
+          <path d="M5 10h7c3 0 6-2 8-6v16c-2-4-5-6-8-6h-7z"></path>
+          {/* Handle Loop */}
+          <path d="M7 14v2a4 4 0 0 0 8 0v-2h-2v2a2 2 0 0 1-4 0v-2h-2z"></path>
+        </svg>
+      </div>
+
       {/* Floating Mute Button (Bottom Right) */}
       <div
         onClick={() => setMuteHonks(!muteHonks)}
         style={{
           position: 'absolute',
-          bottom: 80,
+          bottom: isMobile ? 70 : 80, // Mobile: Above Credits (~50px). Desktop: Keep high.
           right: 20,
           width: 44,
           height: 44,
@@ -1317,7 +1369,7 @@ function App() {
       {/* Mobile Joystick - Bottom Left */}
       {
         isMobile && (
-          <div style={{ position: 'absolute', bottom: 80, left: 80, zIndex: 200 }}>
+          <div style={{ position: 'absolute', bottom: 120, left: 80, zIndex: 200 }}>
             <Joystick
               size={100}
               sticky={false}
@@ -1828,6 +1880,13 @@ function App() {
           />
         )
       }
+      {isJoined && (
+        <Chat
+          messages={chatMessages}
+          onSendMessage={(text) => socketRef.current?.emit('sendChat', text)}
+          isMobile={isMobile}
+        />
+      )}
       <Credits />
 
     </div >

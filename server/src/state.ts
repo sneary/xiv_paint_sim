@@ -61,10 +61,19 @@ export type Action =
     | { type: 'batch'; actions: Action[] };
 
 
+export interface ChatMessage {
+    id: string;
+    sender: string;
+    text: string;
+    color: number;
+    timestamp: number;
+}
+
 export interface GameState {
     players: Record<string, Player>;
     currentPageIndex: number;
     pages: Page[];
+    chatHistory: ChatMessage[];
 }
 
 export const initialState: GameState = {
@@ -84,5 +93,6 @@ export const initialState: GameState = {
             text: [],
             actionHistory: []
         }
-    ]
+    ],
+    chatHistory: []
 };
