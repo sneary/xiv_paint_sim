@@ -374,6 +374,13 @@ function App() {
         return;
       }
 
+      // Undo Trigger (Ctrl+Z)
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        socketRef.current?.emit('undo');
+        return;
+      }
+
       keysPressed.current[e.key.toLowerCase()] = true;
       if (e.key === ' ' && !e.repeat) {
         socketRef.current?.emit('honk');

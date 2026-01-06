@@ -48,6 +48,20 @@ io.on('connection', (socket: Socket) => {
     // Store room ID on socket for easy access
     let currentRoomId: string | null = null;
 
+    // Inactivity Tracking
+    socket.data.lastActive = Date.now();
+    socket.data.warningStage = 0; // 0=None, 1=30m, 2=15m, 3=5m
+
+    // Update activity on ANY event
+    socket.onAny(() => {
+        socket.data.lastActive = Date.now();
+        if (socket.data.warningStage !== 0) {
+            // Reset warnings if they became active
+            socket.data.warningStage = 0;
+            // Optional: specific "Welcome back" message? keeping it silent is better.
+        }
+    });
+
     socket.on('joinGame', (data: {
         action: 'create' | 'join',
         roomId?: string,
@@ -732,6 +746,46 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
+const INACTIVITY_LIMIT_MS = 60 * 60 * 1000; // 60 Minutes
+const CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
+
+setInterval(() => {
+    const now = Date.now();
+    io.sockets.sockets.forEach((socket) => {
+        const lastActive = socket.data.lastActive || now; // Default to now if missing
+        const inactiveDuration = now - lastActive;
+        const timeRemaining = INACTIVITY_LIMIT_MS - inactiveDuration;
+
+        if (inactiveDuration > INACTIVITY_LIMIT_MS) {
+            // Kick
+            console.log(`Kicking inactive socket ${socket.id}`);
+            socket.emit('kick', 'You have been disconnected due to inactivity (60 minutes).');
+            socket.disconnect(true);
+            return;
+        }
+
+        let stage = 0;
+        if (timeRemaining <= 5 * 60 * 1000) stage = 3; // 5 mins
+        else if (timeRemaining <= 15 * 60 * 1000) stage = 2; // 15 mins
+        else if (timeRemaining <= 30 * 60 * 1000) stage = 1; // 30 mins
+
+        // If we reached a new warning stage (higher than current), warn them
+        if (stage > (socket.data.warningStage || 0)) {
+            socket.data.warningStage = stage;
+            const minutes = Math.ceil(timeRemaining / 60000);
+
+            // Send system message
+            socket.emit('chatMessage', {
+                id: 'system-' + Date.now(),
+                sender: 'System Warning',
+                text: `You will be disconnected in ${minutes} minute${minutes !== 1 ? 's' : ''} due to inactivity. Move or chat to stay connected.`,
+                color: 0xff0000, // Red
+                timestamp: Date.now()
+            });
+        }
+    });
+}, CHECK_INTERVAL_MS);
+
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT} `);
 });
