@@ -63,24 +63,44 @@ const Arena = ({
             cursorRef.current.visible = true;
         }
     };
+
+    // Determine Canvas Size
+    // Default to 800x600, but if config has background (RaidPlan) or is larger, expand.
+    const canvasWidth = config.backgroundImageUrl ? config.width : 800;
+    const canvasHeight = config.backgroundImageUrl ? config.height : 600;
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
     return (
         <Stage
-            width={800 * scale}
-            height={600 * scale}
+            width={canvasWidth * scale}
+            height={canvasHeight * scale}
             options={{ background: 0x101010 }}
         >
             <Container scale={scale}>
+                {/* RaidPlan Background Image - Rendered FIRST (behind everything) */}
+                {config.backgroundImageUrl && (
+                    <Sprite
+                        image={config.backgroundImageUrl}
+                        x={centerX}
+                        y={centerY}
+                        width={config.width}
+                        height={config.height}
+                        anchor={0.5}
+                        alpha={1}
+                    />
+                )}
+
                 {/* Interaction Layer - Transparent background to catch events */}
                 <Graphics
                     draw={(g) => {
                         g.clear();
                         g.beginFill(0x000000, 0.0); // Transparent
-                        g.drawRect(0, 0, 800, 600);
+                        g.drawRect(0, 0, canvasWidth, canvasHeight);
                         g.endFill();
                     }}
                     // eventMode='static' replacement for interactive={true} in Pixi 7
                     eventMode={'static'}
-                    hitArea={new PIXI.Rectangle(0, 0, 800, 600)}
+                    hitArea={new PIXI.Rectangle(0, 0, canvasWidth, canvasHeight)}
                     onpointerdown={(e) => {
                         const local = e.getLocalPosition(e.currentTarget as PIXI.DisplayObject);
                         onStrokeStart(local.x, local.y);
@@ -269,6 +289,9 @@ const Arena = ({
                 </Container>
 
                 {/* Background / Arena Boundary */}
+
+
+
                 <Graphics
                     draw={(g: PIXI.Graphics) => {
                         // Start fresh
@@ -279,12 +302,12 @@ const Arena = ({
                         g.lineStyle(2, 0x444444);
 
                         if (config.shape === 'circle') {
-                            g.drawCircle(400, 300, config.width / 2);
+                            g.drawCircle(centerX, centerY, config.width / 2);
                         } else if (config.shape === 'square') {
                             // Square (centered)
                             const halfW = config.width / 2;
                             const halfH = config.height / 2;
-                            g.drawRect(400 - halfW, 300 - halfH, config.width, config.height);
+                            g.drawRect(centerX - halfW, centerY - halfH, config.width, config.height);
                         }
                         // If 'none', draw nothing for the boundary
 
@@ -293,31 +316,31 @@ const Arena = ({
                             g.lineStyle(1, 0xFFFFFF, 0.1); // Very faint white
                             const step = 50;
 
-                            if (config.shape === 'none') {
+                            if (config.shape === 'none' || config.backgroundImageUrl) {
                                 // Full Canvas Grid
-                                // Vertical lines (covering 0 to 800)
-                                for (let x = 0; x <= 800; x += step) {
+                                // Vertical lines
+                                for (let x = 0; x <= canvasWidth; x += step) {
                                     g.moveTo(x, 0);
-                                    g.lineTo(x, 600);
+                                    g.lineTo(x, canvasHeight);
                                 }
-                                // Horizontal lines (covering 0 to 600)
-                                for (let y = 0; y <= 600; y += step) {
+                                // Horizontal lines
+                                for (let y = 0; y <= canvasHeight; y += step) {
                                     g.moveTo(0, y);
-                                    g.lineTo(800, y);
+                                    g.lineTo(canvasWidth, y);
                                 }
                             } else if (config.shape === 'square') {
                                 const halfW = config.width / 2;
                                 const halfH = config.height / 2;
 
-                                // Verticals (centered at 400)
+                                // Verticals (centered)
                                 for (let x = -halfW + step; x < halfW; x += step) {
-                                    g.moveTo(400 + x, 300 - halfH);
-                                    g.lineTo(400 + x, 300 + halfH);
+                                    g.moveTo(centerX + x, centerY - halfH);
+                                    g.lineTo(centerX + x, centerY + halfH);
                                 }
-                                // Horizontals (centered at 300)
+                                // Horizontals (centered)
                                 for (let y = -halfH + step; y < halfH; y += step) {
-                                    g.moveTo(400 - halfW, 300 + y);
-                                    g.lineTo(400 + halfW, 300 + y);
+                                    g.moveTo(centerX - halfW, centerY + y);
+                                    g.lineTo(centerX + halfW, centerY + y);
                                 }
                             } else {
                                 // Circle
@@ -325,14 +348,14 @@ const Arena = ({
                                 // Verticals
                                 for (let x = -r + step; x < r; x += step) {
                                     const limit = Math.sqrt(r * r - x * x);
-                                    g.moveTo(400 + x, 300 - limit);
-                                    g.lineTo(400 + x, 300 + limit);
+                                    g.moveTo(centerX + x, centerY - limit);
+                                    g.lineTo(centerX + x, centerY + limit);
                                 }
                                 // Horizontals
                                 for (let y = -r + step; y < r; y += step) {
                                     const limit = Math.sqrt(r * r - y * y);
-                                    g.moveTo(400 - limit, 300 + y);
-                                    g.lineTo(400 + limit, 300 + y);
+                                    g.moveTo(centerX - limit, centerY + y);
+                                    g.lineTo(centerX + limit, centerY + y);
                                 }
                             }
                         }

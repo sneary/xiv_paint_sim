@@ -39,6 +39,7 @@ export interface ArenaConfig {
     height: number;
     showGrid?: boolean;
     waymarkPreset?: string;
+    backgroundImageUrl?: string; // URL for background image (e.g. from RaidPlan)
 }
 
 export interface Page {

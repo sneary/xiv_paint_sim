@@ -3,13 +3,32 @@ import http from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
+import https from 'https';
+import fs from 'fs';
+import { URL } from 'url';
+// @ts-ignore
+import puppeteer from 'puppeteer';
 
 const app = express();
 app.use(cors());
 
 // Serve static files from the client build
+app.use(cors());
+app.use(express.json());
+
 const clientDistPath = path.join(__dirname, '../../client/dist');
+const uploadsPath = path.join(__dirname, '../public/uploads');
+
+// Ensure uploads directory exists
+if (!fs.existsSync(uploadsPath)) {
+    fs.mkdirSync(uploadsPath, { recursive: true });
+}
+
 app.use(express.static(clientDistPath));
+app.use('/uploads', express.static(uploadsPath));
+
+
+
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -412,6 +431,187 @@ io.on('connection', (socket: Socket) => {
         io.to(currentRoomId).emit('stateUpdate', gs);
     });
 
+    socket.on('requestImport', async (url: string) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        console.log(`User requested import for ${url} [V3-LOGIC]`);
+
+        socket.emit('importProgress', { current: 0, total: 0, status: 'Initializing Browser...' });
+
+        let browser;
+        try {
+            browser = await puppeteer.launch({
+                headless: true,
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1920,1080']
+            });
+            const page = await browser.newPage();
+            await page.setViewport({ width: 1920, height: 1080 });
+
+            socket.emit('importProgress', { current: 0, total: 0, status: 'Navigating to RaidPlan...' });
+
+            await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+
+            // Strategy 1: User provided class names
+            const selector = '.nhcyE a.M_f5h';
+
+            // Wait for canvas
+            try {
+                await page.waitForSelector('.canvas-container', { timeout: 5000 });
+            } catch (e) {
+                console.log('Canvas container not found, proceeding...');
+            }
+
+            // Wait for buttons
+            try {
+                // Wait for ANY generic button-like interaction area just in case.
+                await page.waitForFunction(() => {
+                    const buttons = Array.from(document.querySelectorAll('a, button'));
+                    return buttons.some(b => !isNaN(parseInt(b.textContent || '', 10)));
+                }, { timeout: 5000 });
+            } catch (e) {
+                console.log('Generic number buttons not found immediately, waiting...');
+            }
+
+            let buttons: any[] = await page.$$(selector);
+
+            // Strategy 2: Fallback to finding by Text Content if explicit class fails or finds too few
+            if (buttons.length <= 1) {
+                console.log(`Class selector found ${buttons.length} buttons. Trying text-based search...`);
+
+                // Evaluate inside the page to find elements containing numbers 1..25
+                const numberButtonHandle = await page.evaluateHandle(() => {
+                    const candidates = Array.from(document.querySelectorAll('a, button, div[role="button"]'));
+                    return candidates.filter(el => {
+                        const txt = el.textContent?.trim();
+                        // Exact match integer less than 100
+                        return txt && /^\d+$/.test(txt) && parseInt(txt) < 100;
+                    });
+                });
+
+                const properties = await numberButtonHandle.getProperties();
+                buttons = [];
+                for (const prop of properties.values()) {
+                    const elementHandle = prop.asElement();
+                    if (elementHandle) buttons.push(elementHandle);
+                }
+            }
+
+            // Debugging: Log what we found
+            if (buttons.length === 0) {
+                console.log("Still no buttons found. Dumping body HTML snippet for debug...");
+                const html = await page.content();
+                console.log(html.substring(0, 1500) + '...');
+            }
+
+            // Sort buttons by their numeric text value to ensure correct order
+            if (buttons.length > 0) {
+                const buttonValPairs = [];
+                for (const btn of buttons) {
+                    const txt = await (await btn.getProperty('textContent')).jsonValue();
+                    const val = parseInt(txt as string, 10);
+                    if (!isNaN(val)) {
+                        buttonValPairs.push({ btn, val });
+                    }
+                }
+                // Sort by val
+                buttonValPairs.sort((a, b) => a.val - b.val);
+                buttons = buttonValPairs.map(p => p.btn);
+            }
+
+            const pagesData: any[] = [];
+            const totalSteps = buttons.length > 0 ? buttons.length : 1;
+
+            socket.emit('importProgress', { current: 0, total: totalSteps, status: 'Starting capture...' });
+
+            if (buttons.length === 0) {
+                // Single page capture
+                const filename = `import_${Date.now()}_step_0.png`;
+                const filepath = path.join(uploadsPath, filename);
+
+                const container = await page.$('.canvas-container') || await page.$('canvas');
+                if (container) {
+                    await container.screenshot({ path: filepath });
+                } else {
+                    await page.screenshot({ path: filepath });
+                }
+
+                pagesData.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    config: {
+                        shape: 'square',
+                        width: 1200,
+                        height: 675,
+                        backgroundImageUrl: '/uploads/' + filename,
+                        showGrid: false
+                    },
+                    strokes: [],
+                    markers: {},
+                    text: [],
+                    actionHistory: []
+                });
+            } else {
+                console.log(`Found ${buttons.length} steps.`);
+                for (let i = 0; i < buttons.length; i++) {
+                    socket.emit('importProgress', { current: i + 1, total: totalSteps, status: `Capturing Page ${i + 1}...` });
+
+                    // Re-query
+                    const currentButtons = await page.$$(selector);
+                    if (currentButtons[i]) {
+                        await currentButtons[i].click();
+                        // Wait for update
+                        await new Promise(r => setTimeout(r, 1500));
+
+                        const filename = `import_${Date.now()}_step_${i}.png`;
+                        const filepath = path.join(uploadsPath, filename);
+
+                        const container = await page.$('.canvas-container') || await page.$('canvas');
+                        if (container) {
+                            await container.screenshot({ path: filepath });
+                        } else {
+                            await page.screenshot({ path: filepath });
+                        }
+
+                        // Get dimensions
+                        const size = await page.evaluate(() => {
+                            const c = document.querySelector('canvas');
+                            return c ? { w: c.width, h: c.height } : { w: 1200, h: 675 };
+                        });
+
+                        pagesData.push({
+                            id: Math.random().toString(36).substr(2, 9),
+                            config: {
+                                shape: 'square',
+                                width: size.w,
+                                height: size.h,
+                                backgroundImageUrl: '/uploads/' + filename,
+                                showGrid: false
+                            },
+                            strokes: [],
+                            markers: {},
+                            text: [],
+                            actionHistory: []
+                        });
+                    }
+                }
+            }
+
+            await browser.close();
+
+            // Add pages to room
+            const gs = rooms[currentRoomId];
+            gs.pages.push(...pagesData);
+            // Switch to first imported page
+            gs.currentPageIndex = gs.pages.length - pagesData.length;
+
+            io.to(currentRoomId).emit('stateUpdate', gs);
+            socket.emit('importComplete');
+
+        } catch (e: any) {
+            console.error("Puppeteer Import Error:", e);
+            if (browser) await browser.close();
+            socket.emit('importError', { message: e.message || 'Unknown Error' });
+        }
+    });
+
     socket.on('undo', () => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
         const gs = rooms[currentRoomId];
@@ -664,6 +864,23 @@ io.on('connection', (socket: Socket) => {
 
         gs.pages.push(newPage);
         gs.currentPageIndex = gs.pages.length - 1; // Auto-switch to new page? Usually yes.
+        io.to(currentRoomId).emit('stateUpdate', gs);
+    });
+
+    socket.on('importPages', (pages: any[]) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const gs = rooms[currentRoomId];
+
+        // Append all imported pages
+        // Assign new IDs just in case
+        pages.forEach(p => {
+            if (!p.id) p.id = Math.random().toString(36).substr(2, 9);
+            gs.pages.push(p);
+        });
+
+        // Switch to the first imported page
+        gs.currentPageIndex = gs.pages.length - pages.length;
+
         io.to(currentRoomId).emit('stateUpdate', gs);
     });
 

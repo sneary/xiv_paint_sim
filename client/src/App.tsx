@@ -172,6 +172,14 @@ function App() {
     }
   };
 
+  // Import Modal State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importUrl, setImportUrl] = useState('');
+  const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'error' | 'done'>('idle');
+  const [importProgress, setImportProgress] = useState(0);
+  const [importTotal, setImportTotal] = useState(0);
+  const [importMessage, setImportMessage] = useState('');
+
   // Socket Events
   useEffect(() => {
     // If we have a socket already, don't recreate unless URL changed (it won't)
@@ -308,6 +316,28 @@ function App() {
       }, 200);
     });
 
+    newSocket.on('importProgress', (data: { current: number, total: number, status: string }) => {
+      setImportProgress(data.current);
+      setImportTotal(data.total);
+      setImportMessage(data.status);
+    });
+
+    newSocket.on('importError', (data: { message: string }) => {
+      setImportStatus('error');
+      setImportMessage(data.message);
+      setIsProcessing(false);
+    });
+
+    newSocket.on('importComplete', () => {
+      setImportStatus('done');
+      setImportMessage('Import Complete!');
+      setIsProcessing(false);
+      setTimeout(() => {
+        setShowImportModal(false);
+        setImportStatus('idle');
+      }, 1500);
+    });
+
     return () => {
       newSocket.disconnect();
     };
@@ -383,6 +413,32 @@ function App() {
         resolve(response);
       });
     });
+  };
+
+  const handleImportRaidPlan = () => {
+    setShowImportModal(true);
+    setImportUrl('');
+  };
+
+  const executeImport = () => {
+    if (!importUrl) return;
+    if (!importUrl.includes('raidplan.io')) {
+      alert("Invalid URL. Please use a raidplan.io link.");
+      return;
+    }
+
+    setImportStatus('processing');
+    setImportMessage('Initializing import...');
+    setImportProgress(0);
+    setImportTotal(0);
+
+    // Emit socket event instead of HTTP fetch
+    if (socketRef.current) {
+      socketRef.current.emit('requestImport', importUrl);
+    } else {
+      setImportStatus('error');
+      setImportMessage('Socket not connected.');
+    }
   };
 
   // Input handling setup
@@ -509,9 +565,14 @@ function App() {
         // The previous logic used hardcoded centerX=400.
         // Let's stick to 800x600 base coord system which matches server state.
 
-        // Clamp to 800x600
-        newX = Math.max(playerRadius, Math.min(newX, 800 - playerRadius));
-        newY = Math.max(playerRadius, Math.min(newY, 600 - playerRadius));
+        // Clamp to current arena dimensions
+        const currentPage = gameStateRef.current.pages[gameStateRef.current.currentPageIndex];
+        // Default to 800x600 if no config or background, but our new pages have config.width/height
+        const maxWidth = currentPage.config ? (currentPage.config.backgroundImageUrl ? currentPage.config.width : 800) : 800;
+        const maxHeight = currentPage.config ? (currentPage.config.backgroundImageUrl ? currentPage.config.height : 600) : 600;
+
+        newX = Math.max(playerRadius, Math.min(newX, maxWidth - playerRadius));
+        newY = Math.max(playerRadius, Math.min(newY, maxHeight - playerRadius));
 
         // Update Physics State Immediately
         localPlayerRef.current = { x: newX, y: newY };
@@ -1055,22 +1116,49 @@ function App() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
+      const pagesToSave = await Promise.all(gameState.pages.map(async (p) => {
+        const page = JSON.parse(JSON.stringify(p)); // Deep clone
+        if (page.config?.backgroundImageUrl && page.config.backgroundImageUrl.startsWith('/')) {
+          try {
+            // Fetch the local image
+            const response = await fetch(page.config.backgroundImageUrl);
+            const blob = await response.blob();
+            // Convert to Base64
+            const base64Data = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+            page.config.backgroundImageUrl = base64Data;
+          } catch (e) {
+            console.error('Failed to inline image for save:', page.config.backgroundImageUrl, e);
+            // Fallback: Check if it's already a data URI or keep path
+          }
+        }
+        return page;
+      }));
+
       const saveData = {
-        pages: gameState.pages,
+        pages: pagesToSave,
         currentPageIndex: gameState.currentPageIndex
       };
+
       const json = JSON.stringify(saveData, null, 2);
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `xiv-sim-save-${new Date().toISOString().slice(0, 10)}.json`;
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('en-CA'); // YYYY-MM-DD
+      const timeStr = now.toLocaleTimeString('en-GB', { hour12: false }).replace(/:/g, '-'); // HH-MM-SS
+      link.download = `xiv-paint-save-${dateStr}-${timeStr}.json`;
       document.body.appendChild(link);
       link.click();
 
-      // Cleanup after a small delay to ensure the download triggers
+      // Cleanup
       setTimeout(() => {
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
@@ -1730,6 +1818,119 @@ function App() {
               </CollapsibleSection>
             </div>
 
+            {/* Import Modal */}
+            {showImportModal && (
+              <div style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                background: 'rgba(0,0,0,0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 2000
+              }}>
+                <div style={{
+                  background: '#222',
+                  padding: '20px',
+                  borderRadius: '8px',
+                  border: '1px solid #444',
+                  width: '400px',
+                  maxWidth: '90%'
+                }}>
+                  <h3 style={{ color: '#fff', marginTop: 0 }}>Import from RaidPlan.io</h3>
+
+                  {importStatus === 'processing' ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                      <p style={{ color: '#fff', marginBottom: '10px' }}>{importMessage}</p>
+                      <div style={{ width: '100%', height: '10px', background: '#444', borderRadius: '5px', overflow: 'hidden' }}>
+                        <div style={{
+                          width: `${importTotal > 0 ? (importProgress / importTotal) * 100 : 0}%`,
+                          height: '100%',
+                          background: '#4a90e2',
+                          transition: 'width 0.3s ease'
+                        }} />
+                      </div>
+                      <p style={{ color: '#aaa', fontSize: '12px', marginTop: '5px' }}>
+                        {importTotal > 0 ? `Page ${importProgress} of ${importTotal}` : 'Preparing...'}
+                      </p>
+                    </div>
+                  ) : importStatus === 'error' ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                      <p style={{ color: '#ff4444', marginBottom: '15px' }}>{importMessage}</p>
+                      <button
+                        onClick={() => setImportStatus('idle')}
+                        style={{
+                          padding: '8px 16px',
+                          background: '#333',
+                          border: '1px solid #555',
+                          color: '#fff',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Try Again
+                      </button>
+                    </div>
+                  ) : importStatus === 'done' ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                      <p style={{ color: '#00ff00', marginBottom: '15px' }}>{importMessage}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <p style={{ color: '#aaa', fontSize: '14px' }}>Paste the full URL of the plan you want to import.</p>
+
+                      <input
+                        type="text"
+                        placeholder="https://raidplan.io/plan/..."
+                        value={importUrl}
+                        onChange={(e) => setImportUrl(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px',
+                          background: '#333',
+                          border: '1px solid #555',
+                          borderRadius: '4px',
+                          color: '#fff',
+                          marginBottom: '15px'
+                        }}
+                      />
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+                        <button
+                          onClick={() => setShowImportModal(false)}
+                          style={{
+                            padding: '8px 16px',
+                            background: 'transparent',
+                            border: '1px solid #555',
+                            color: '#fff',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={executeImport}
+                          disabled={!importUrl}
+                          style={{
+                            padding: '8px 16px',
+                            background: importUrl ? '#4a90e2' : '#2a2a2a',
+                            border: 'none',
+                            color: importUrl ? '#fff' : '#555',
+                            borderRadius: '4px',
+                            cursor: importUrl ? 'pointer' : 'default',
+                            fontWeight: 'bold'
+                          }}
+                        >
+                          Import
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
         )
       }
@@ -1770,7 +1971,37 @@ function App() {
             </span>
           </>
         ) : 'Connecting...'}
-        {!isMobile && <><br />Use W/A/S/D to move. Press Space to Honk. Click and drag in arena to paint.</>}
+        {!isMobile && (
+          <>
+            <br />Use W/A/S/D to move. Press Space to Honk. Click and drag in arena to paint.
+            <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '8px', color: '#ccc' }}>
+              <span>Try importing a raid plan to get started:</span>
+              <button
+                onClick={handleImportRaidPlan}
+                title="Import from RaidPlan.io"
+                style={{
+                  background: 'none',
+                  border: '1px solid #555',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '4px',
+                  transition: 'background 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.background = '#333'}
+                onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#00B4FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Party List Container */}
@@ -1825,7 +2056,11 @@ function App() {
         )
       }
 
-      <div style={{ position: 'relative', width: 800 * scale, height: 600 * scale }}>
+      <div style={{
+        position: 'relative',
+        width: ((gameState.pages[gameState.currentPageIndex].config?.backgroundImageUrl && gameState.pages[gameState.currentPageIndex].config?.width) || 800) * scale,
+        height: ((gameState.pages[gameState.currentPageIndex].config?.backgroundImageUrl && gameState.pages[gameState.currentPageIndex].config?.height) || 600) * scale
+      }}>
         <Arena
           players={gameState.players}
           myId={socketRef.current?.id}
@@ -1904,6 +2139,7 @@ function App() {
             onDuplicatePage={handleDuplicatePage}
             onDeletePage={handleDeletePage}
             onChangePage={handleChangePage}
+            onImport={handleImportRaidPlan}
           />
         )
       }

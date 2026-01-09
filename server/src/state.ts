@@ -15,6 +15,7 @@ export interface ArenaConfig {
     height: number;
     showGrid?: boolean;
     waymarkPreset?: string;
+    backgroundImageUrl?: string;
 }
 
 export interface Point {
