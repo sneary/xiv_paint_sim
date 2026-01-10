@@ -441,7 +441,14 @@ io.on('connection', (socket: Socket) => {
         try {
             browser = await puppeteer.launch({
                 headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox', '--window-size=1920,1080']
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--window-size=1920,1080'
+                ]
             });
             const page = await browser.newPage();
             await page.setViewport({ width: 1920, height: 1080 });
