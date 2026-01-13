@@ -37,7 +37,7 @@ const io = new Server(server, {
         methods: ["GET", "POST"]
     },
     pingTimeout: 60000, // 60s timeout (default 20s is too sensitive)
-    pingInterval: 25000, // 25s ping
+    pingInterval: 20000, // 20s ping (Reduced to avoid LB timeouts)
     transports: ['websocket', 'polling'] // Allow both, but prefer WS
 });
 

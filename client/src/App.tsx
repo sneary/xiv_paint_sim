@@ -349,7 +349,7 @@ function App() {
       if (socketRef.current) {
         socketRef.current.emit('keepalive');
       }
-    }, 15000); // Send heartbeat every 15s to keep server CPU awake
+    }, 5000); // Send heartbeat every 5s to keep server CPU awake (Anti-throttling aggressively)
     return () => clearInterval(interval);
   }, []);
 
