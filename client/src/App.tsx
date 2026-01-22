@@ -15,6 +15,7 @@ import PageControls from './components/PageControls';
 import Credits from './components/Credits';
 import Chat from './components/Chat';
 import type { ChatMessage } from './types';
+import InstanceTimer from './components/InstanceTimer';
 
 // In production, we connect DIRECTLY to Cloud Run to bypass Firebase Hosting proxy latency.
 // CHECK: If running locally (localhost), use localhost even if built in PROD mode.
@@ -2151,7 +2152,7 @@ function App() {
         />
       )}
       <Credits />
-
+      <InstanceTimer expiresAt={gameState.instanceExpiresAt} />
     </div >
   );
 }

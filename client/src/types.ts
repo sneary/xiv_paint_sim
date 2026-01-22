@@ -73,6 +73,7 @@ export interface GameState {
     currentPageIndex: number;
     pages: Page[];
     chatHistory: ChatMessage[];
+    instanceExpiresAt?: number;
 }
 
 export const initialState: GameState = {

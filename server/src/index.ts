@@ -109,6 +109,9 @@ io.on('connection', (socket: Socket) => {
             rooms[roomId] = createInitialState();
             console.log(`Room created: ${roomId} `);
 
+            const duration = 2 * 60 * 60 * 1000; // 2 Hours
+            rooms[roomId].instanceExpiresAt = Date.now() + duration;
+
             // Set 2-hour Hard Instance Timer
             roomInstanceTimers[roomId] = setTimeout(() => {
                 const r = roomId!; // capture
@@ -125,7 +128,7 @@ io.on('connection', (socket: Socket) => {
                 if (roomInstanceTimers[r]) {
                     delete roomInstanceTimers[r];
                 }
-            }, 2 * 60 * 60 * 1000); // 2 Hours
+            }, duration);
 
         } else {
             // Join existing
