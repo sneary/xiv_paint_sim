@@ -46,8 +46,8 @@ import { GameState, initialState, ArenaConfig } from './state';
 // Room State Management
 // Room State Management
 const rooms: Record<string, GameState> = {};
+const roomInstanceTimers: Record<string, NodeJS.Timeout> = {};
 const roomDeletionTimers: Record<string, NodeJS.Timeout> = {};
-const roomPlayerActivity: Record<string, number> = {}; // Key: "roomId:playerName", Value: lastActiveTimestamp
 
 function generateRoomId(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -72,32 +72,6 @@ io.on('connection', (socket: Socket) => {
     // Store room ID on socket for easy access
     let currentRoomId: string | null = null;
 
-    // Inactivity Tracking
-    socket.data.lastActive = Date.now();
-    socket.data.warningStage = 0; // 0=None, 1=30m, 2=15m, 3=5m
-
-    // Update activity on ANY event
-    socket.onAny(() => {
-        const now = Date.now();
-        socket.data.lastActive = now;
-
-        // Update persistent map if user is in a room (we need to know their name/room)
-        // Unfortunately onAny doesn't easy give us access to 'name' unless we stored it on socket
-        // But we DO store roomId on socket! We just need name.
-        if (currentRoomId && socket.data.name) { // We'll add name to socket.data in joinGame
-            roomPlayerActivity[`${currentRoomId}:${socket.data.name}`] = now;
-        }
-
-        if (socket.data.warningStage !== 0) {
-            // Reset warnings if they became active
-            socket.data.warningStage = 0;
-        }
-    });
-
-    // Persistent AFK Tracking (Room:Name -> LastActive Timestamp)
-    // This ensures disconnects don't reset the timer.
-    const afkPersistence: Record<string, number> = {};
-
     socket.on('joinGame', (data: {
         action: 'create' | 'join',
         roomId?: string,
@@ -113,6 +87,25 @@ io.on('connection', (socket: Socket) => {
             roomId = generateRoomId();
             rooms[roomId] = createInitialState();
             console.log(`Room created: ${roomId} `);
+
+            // Set 2-hour Hard Instance Timer
+            roomInstanceTimers[roomId] = setTimeout(() => {
+                const r = roomId!; // capture
+                console.log(`Room ${r} expired (2 hours). Deleting.`);
+                if (rooms[r]) {
+                    io.to(r).emit('kick', 'The room instance has expired (2 hours).');
+                    io.in(r).disconnectSockets(true);
+                    delete rooms[r];
+                }
+                if (roomDeletionTimers[r]) {
+                    clearTimeout(roomDeletionTimers[r]);
+                    delete roomDeletionTimers[r];
+                }
+                if (roomInstanceTimers[r]) {
+                    delete roomInstanceTimers[r];
+                }
+            }, 2 * 60 * 60 * 1000); // 2 Hours
+
         } else {
             // Join existing
             if (!roomId || !rooms[roomId]) {
@@ -152,18 +145,7 @@ io.on('connection', (socket: Socket) => {
         // Success - Join Room
         currentRoomId = roomId!;
         socket.join(currentRoomId);
-        socket.data.name = data.name; // Store for AFK tracking
-
-        // AFK Persistence Logic
-        const userKey = `${currentRoomId}:${data.name}`;
-        if (roomPlayerActivity[userKey]) {
-            // Restore previous activity time (don't reset to now)
-            socket.data.lastActive = roomPlayerActivity[userKey];
-        } else {
-            // New user or expired
-            socket.data.lastActive = Date.now();
-            roomPlayerActivity[userKey] = Date.now();
-        }
+        socket.data.name = data.name;
 
         // Add Player
         gameState.players[socket.id] = {
@@ -966,6 +948,7 @@ io.on('connection', (socket: Socket) => {
             delete rooms[currentRoomId].players[socket.id];
 
             // Logic to clean up empty rooms?
+            // If room is empty, schedule deletion in 5 minutes
             if (Object.keys(rooms[currentRoomId].players).length === 0) {
                 // Determine if we should delete. Maybe timeout?
                 // For now, keep it simple. If everyone leaves, room data is cleared immediately to free memory,
@@ -974,7 +957,6 @@ io.on('connection', (socket: Socket) => {
                 // Actually user might want to refresh and re-join, deleting immediately is harsh. 
                 // Let's keep it for now.
 
-                // If room is empty, schedule deletion in 5 minutes
                 if (!roomDeletionTimers[currentRoomId]) {
                     console.log(`Room ${currentRoomId} is empty.Scheduling deletion in 5 minutes.`);
                     roomDeletionTimers[currentRoomId] = setTimeout(() => {
@@ -984,6 +966,12 @@ io.on('connection', (socket: Socket) => {
                                 console.log(`Deleting empty room: ${currentRoomId} `);
                                 delete rooms[currentRoomId];
                                 delete roomDeletionTimers[currentRoomId];
+
+                                // Also clear the instance timer if it exists
+                                if (roomInstanceTimers[currentRoomId]) {
+                                    clearTimeout(roomInstanceTimers[currentRoomId]);
+                                    delete roomInstanceTimers[currentRoomId];
+                                }
                             }
                         }
                     }, 5 * 60 * 1000);
@@ -1002,45 +990,7 @@ app.get('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3001;
-const INACTIVITY_LIMIT_MS = 60 * 60 * 1000; // 60 Minutes
-const CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
 
-setInterval(() => {
-    const now = Date.now();
-    io.sockets.sockets.forEach((socket) => {
-        const lastActive = socket.data.lastActive || now; // Default to now if missing
-        const inactiveDuration = now - lastActive;
-        const timeRemaining = INACTIVITY_LIMIT_MS - inactiveDuration;
-
-        if (inactiveDuration > INACTIVITY_LIMIT_MS) {
-            // Kick
-            console.log(`Kicking inactive socket ${socket.id}`);
-            socket.emit('kick', 'You have been disconnected due to inactivity (60 minutes).');
-            socket.disconnect(true);
-            return;
-        }
-
-        let stage = 0;
-        if (timeRemaining <= 5 * 60 * 1000) stage = 3; // 5 mins
-        else if (timeRemaining <= 15 * 60 * 1000) stage = 2; // 15 mins
-        else if (timeRemaining <= 30 * 60 * 1000) stage = 1; // 30 mins
-
-        // If we reached a new warning stage (higher than current), warn them
-        if (stage > (socket.data.warningStage || 0)) {
-            socket.data.warningStage = stage;
-            const minutes = Math.ceil(timeRemaining / 60000);
-
-            // Send system message
-            socket.emit('chatMessage', {
-                id: 'system-' + Date.now(),
-                sender: 'System Warning',
-                text: `You will be disconnected in ${minutes} minute${minutes !== 1 ? 's' : ''} due to inactivity. Move or chat to stay connected.`,
-                color: 0xff0000, // Red
-                timestamp: Date.now()
-            });
-        }
-    });
-}, CHECK_INTERVAL_MS);
 
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT} `);
