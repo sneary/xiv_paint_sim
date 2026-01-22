@@ -10,7 +10,28 @@ import { URL } from 'url';
 import puppeteer from 'puppeteer';
 
 const app = express();
-app.use(cors());
+
+// Bot Blocking Middleware
+app.use((req, res, next) => {
+    const userAgent = req.headers['user-agent']?.toLowerCase() || '';
+    const bots = [
+        'googlebot', 'bingbot', 'yandexbot', 'duckduckbot', 'slurp',
+        'baiduspider', 'facebot', 'ia_archiver', 'twitterbot', 'facebookexternalhit',
+        'linkedinbot', 'embedly', 'quora link preview', 'showyoubot', 'outbrain',
+        'pinterest/0.', 'developers.google.com/+/web/snippet', 'slackbot', 'vkshare',
+        'w3c_validator', 'redditbot', 'applebot', 'whatsapp', 'flipboard',
+        'tumblr', 'bitlybot', 'skypeuripreview', 'nuzzel', 'discordbot',
+        'google page speed', 'qwantify', 'pinterest', 'bitrix', 'xing-content'
+    ];
+
+    if (bots.some(bot => userAgent.includes(bot))) {
+        // Log lightly
+        // console.log(`Blocked bot: ${userAgent}`);
+        res.status(403).send('Bots forbidden');
+        return;
+    }
+    next();
+});
 
 // Serve static files from the client build
 app.use(cors());
