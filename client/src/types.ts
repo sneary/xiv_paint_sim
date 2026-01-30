@@ -1,3 +1,9 @@
+export interface DebuffEntry {
+    id: number;
+    source: string;
+    timestamp: number;
+}
+
 export interface Player {
     id: string;
     x: number;
@@ -6,6 +12,7 @@ export interface Player {
     name: string;
     role: 'tank' | 'healer' | 'dps' | 'spectator';
     debuffs: number[];
+    debuffHistory?: DebuffEntry[];
     limitCut?: number;
 }
 
@@ -22,6 +29,7 @@ export interface Stroke {
     isEraser?: boolean;
     type?: 'freehand' | 'line' | 'circle' | 'donut' | 'cone' | 'rect';
     anticlockwise?: boolean;
+    alpha?: number;
 }
 
 export interface TextObject {
@@ -68,15 +76,80 @@ export interface ChatMessage {
     timestamp: number;
 }
 
+
+// Simulation Types
+export interface Prop {
+    id: string;
+    type: 'circle' | 'rect' | 'cone' | 'donut' | 'text';
+    x: number;
+    y: number;
+    rotation?: number;
+
+    // Interaction
+    isDamaging?: boolean;
+    damageAmount?: number;
+
+    // Visuals
+    color: number;
+    alpha: number;
+    width?: number; // Radius for circle/donut, Width for rect
+    height?: number; // InnerRadius for donut, Height for rect
+    text?: string;
+
+    // Lifecycle
+    createdAt: number;
+    duration?: number;
+    tetherTo?: string; // ID of object/player to tether to
+
+    // Physics
+    isSolid?: boolean;
+    allowKnockback?: boolean;
+    attachTo?: string; // Player ID to attach to
+    imageUrl?: string; // For image props
+    damageOnExpiration?: boolean;
+    applyDebuffIdOnExpiration?: number;
+    applyDebuffIdOnStart?: number;
+    name?: string;
+}
+
+export interface SimulationState {
+    isRunning: boolean;
+    startTime?: number;
+    playbackSpeed: number;
+    activeTimelineId?: string;
+    activeProps: Prop[];
+    bossCast?: {
+        name: string;
+        startTime: number;
+        duration: number;
+        x?: number; // Percent 0-100 or Pixels
+        y?: number;
+        scale?: number;
+    } | null;
+    boss?: {
+        id: string;
+        x: number;
+        y: number;
+        opacity: number;
+        duration?: number;
+        createdAt: number;
+    } | null;
+}
+
 export interface GameState {
+
     players: Record<string, Player>;
     currentPageIndex: number;
     pages: Page[];
     chatHistory: ChatMessage[];
     instanceExpiresAt?: number;
+
+    // Active Simulation
+    simulation: SimulationState;
 }
 
 export const initialState: GameState = {
+
     players: {},
     currentPageIndex: 0,
     pages: [
@@ -93,5 +166,11 @@ export const initialState: GameState = {
             text: []
         }
     ],
-    chatHistory: []
+    chatHistory: [],
+    simulation: {
+        isRunning: false,
+        playbackSpeed: 1,
+        activeProps: [],
+        bossCast: null
+    }
 };

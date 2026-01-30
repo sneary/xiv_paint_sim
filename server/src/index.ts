@@ -62,11 +62,14 @@ const io = new Server(server, {
     transports: ['websocket', 'polling'] // Allow both, but prefer WS
 });
 
-import { GameState, initialState, ArenaConfig } from './state';
+import { GameState, initialState, ArenaConfig, SimulationState } from './state';
+import { SimulationEngine } from './simulation/SimulationEngine';
+import { ARENA_SPLIT_TIMELINE } from './simulation/timelines/arena_split';
 
 // Room State Management
 // Room State Management
 const rooms: Record<string, GameState> = {};
+const simEngines: Record<string, SimulationEngine> = {};
 const roomInstanceTimers: Record<string, NodeJS.Timeout> = {};
 const roomDeletionTimers: Record<string, NodeJS.Timeout> = {};
 
@@ -127,6 +130,10 @@ io.on('connection', (socket: Socket) => {
                 }
                 if (roomInstanceTimers[r]) {
                     delete roomInstanceTimers[r];
+                }
+                if (simEngines[r]) {
+                    simEngines[r].stop();
+                    delete simEngines[r];
                 }
             }, duration);
 
@@ -224,7 +231,11 @@ io.on('connection', (socket: Socket) => {
                 gs.players[socket.id].y = pos.y;
                 // Optimization: Don't broadcast full state on every move.
                 // Just send the player's new position.
-                io.to(currentRoomId).emit('playerMoved', { id: socket.id, x: pos.x, y: pos.y });
+
+                // Broadcast to others (exclude self? Index.ts broadcast logic usually includes self if io.to...)
+                // Actually usually we want to broadcast to *others* so they update. 
+                // Self already updated optimistically.
+                socket.broadcast.to(currentRoomId).emit('playerMoved', { id: socket.id, x: pos.x, y: pos.y });
             }
         }
     });
@@ -267,6 +278,16 @@ io.on('connection', (socket: Socket) => {
                 'A': { x: cx, y: cy - cd }, 'B': { x: cx + cd, y: cy },
                 'C': { x: cx, y: cy + cd }, 'D': { x: cx - cd, y: cy }
             };
+        } else if (newConfig.waymarkPreset === 'arena-split-outer') {
+            console.log('Applying arena-split-outer preset');
+            // Exact positions derived from screenshot analysis:
+            // 1,2,3,4 are approx 16px wider/taller than the 1/4 grid lines (272 vs 256, 125 vs 150)
+            // D, B are approx 386/638 (Grid 384/640 +/- 2px, but we use symmetry)
+            page.markers = {
+                '1': { x: 277, y: 125 }, '2': { x: 747, y: 125 },
+                '3': { x: 747, y: 449 }, '4': { x: 277, y: 449 },
+                'D': { x: 386, y: 287 }, 'B': { x: 638, y: 287 }
+            };
         }
 
         page.config = { ...page.config, ...newConfig };
@@ -284,7 +305,8 @@ io.on('connection', (socket: Socket) => {
             width: data.width || 3,
             isEraser: !!data.isEraser,
             type: data.type || 'freehand',
-            anticlockwise: data.anticlockwise
+            anticlockwise: data.anticlockwise,
+            alpha: data.alpha
         });
         if (!page.actionHistory) page.actionHistory = [];
         page.actionHistory.push({ type: 'add_stroke', id: data.id });
@@ -860,7 +882,110 @@ io.on('connection', (socket: Socket) => {
         io.to(currentRoomId).emit('stateUpdate', gs);
     });
 
+    // --- Simulation Events ---
+    socket.on('startSimulation', (data: { timelineId: string }) => {
+        if (!currentRoomId || !rooms[currentRoomId]) return;
+        const roomId = currentRoomId;
+        const gs = rooms[roomId];
+
+        // Initialize Engine if not exists
+        if (!simEngines[roomId]) {
+
+            simEngines[roomId] = new SimulationEngine(
+                gs.simulation,
+                (newSimState) => {
+                    // onUpdate
+                    if (rooms[roomId]) {
+                        rooms[roomId].simulation = newSimState;
+                        io.to(roomId).emit('stateUpdate', rooms[roomId]);
+                    }
+                },
+                () => {
+                    // getPlayers
+                    return rooms[roomId] ? rooms[roomId].players : {};
+                },
+                (pid, debuffs, history) => {
+                    // onApplyDebuff
+                    if (rooms[roomId] && rooms[roomId].players[pid]) {
+                        rooms[roomId].players[pid].debuffs = debuffs;
+                        if (history) {
+                            rooms[roomId].players[pid].debuffHistory = history;
+                        }
+                        io.to(roomId).emit('stateUpdate', rooms[roomId]);
+                    }
+                },
+                (pid, dx, dy, duration) => {
+                    // onKnockback
+                    if (rooms[roomId] && rooms[roomId].players[pid]) {
+                        io.to(roomId).emit('forceKnockback', { id: pid, dx, dy, duration });
+                    }
+                },
+                (config) => {
+                    // onConfigUpdate
+                    if (rooms[roomId]) {
+                        const page = rooms[roomId].pages[rooms[roomId].currentPageIndex];
+                        page.config = { ...page.config, ...config };
+                        io.to(roomId).emit('stateUpdate', rooms[roomId]);
+                    }
+                },
+                (duration) => {
+                    // onCountdown
+                    let remaining = duration;
+                    const run = () => {
+                        if (remaining > 0) {
+                            io.to(roomId).emit('countdown', remaining.toString());
+                            remaining--;
+                            setTimeout(run, 1000);
+                        } else {
+                            io.to(roomId).emit('countdown', 'START');
+                            setTimeout(() => io.to(roomId).emit('countdown', null), 1000);
+                        }
+                    };
+                    run();
+                },
+                (msg) => {
+                    // onLogMessage
+                    if (!rooms[roomId]) return;
+                    const gs = rooms[roomId];
+                    const message = {
+                        id: Math.random().toString(36).substr(2, 9),
+                        sender: 'SYSTEM',
+                        text: msg,
+                        color: 0xFF5555, // Reddish for damage/system
+                        timestamp: Date.now()
+                    };
+                    if (!gs.chatHistory) gs.chatHistory = [];
+                    gs.chatHistory.push(message);
+                    if (gs.chatHistory.length > 50) gs.chatHistory.shift();
+                    io.to(roomId).emit('chatMessage', message);
+                }
+            );
+
+
+        }
+
+        const engine = simEngines[roomId];
+
+        // Load Timeline Data
+        if (data.timelineId === 'arena_split') {
+            engine.loadTimeline(ARENA_SPLIT_TIMELINE);
+        }
+
+        engine.start();
+    });
+
+    socket.on('stopSimulation', () => {
+        if (!currentRoomId || !simEngines[currentRoomId]) return;
+        simEngines[currentRoomId].stop();
+    });
+
+    socket.on('resetSimulation', () => {
+        if (!currentRoomId || !simEngines[currentRoomId]) return;
+        simEngines[currentRoomId].reset();
+    });
+
     // --- Page Management ---
+
     socket.on('addPage', () => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
         const gs = rooms[currentRoomId];

@@ -4,7 +4,7 @@ import { Joystick } from 'react-joystick-component';
 import './App.css';
 import Arena from './components/Arena';
 import ConfigMenu from './components/ConfigMenu';
-import type { GameState, ArenaConfig, Stroke, TextObject } from './types';
+import { type GameState, type ArenaConfig, type Stroke, type TextObject, type Player, initialState } from './types';
 import { hitTest, getSelectionBounds } from './utils';
 import LandingPage from './components/LandingPage';
 import PartyList from './components/PartyList';
@@ -16,6 +16,7 @@ import Credits from './components/Credits';
 import Chat from './components/Chat';
 import type { ChatMessage } from './types';
 import InstanceTimer from './components/InstanceTimer';
+import CastBar from './components/CastBar';
 
 // In production, we connect DIRECTLY to Cloud Run to bypass Firebase Hosting proxy latency.
 // CHECK: If running locally (localhost), use localhost even if built in PROD mode.
@@ -23,18 +24,7 @@ const isLocal = window.location.hostname === 'localhost' || window.location.host
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || ((import.meta.env.PROD && !isLocal) ? 'https://xiv-paint-sim-366274758228.us-south1.run.app' : 'http://localhost:3001');
 
 function App() {
-  const [gameState, setGameState] = useState<GameState>({
-    players: {},
-    currentPageIndex: 0,
-    pages: [{
-      id: 'init',
-      config: { shape: 'circle', width: 500, height: 500 },
-      strokes: [],
-      markers: {},
-      text: []
-    }],
-    chatHistory: []
-  });
+  const [gameState, setGameState] = useState<GameState>(initialState);
   const socketRef = useRef<Socket | null>(null);
   const [isJoined, setIsJoined] = useState(false);
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -58,12 +48,28 @@ function App() {
   // Movement state
   const keysPressed = useRef<Record<string, boolean>>({});
   const lastMoveEmit = useRef<number>(0);
+  const wasMovingRef = useRef<boolean>(false);
   // Physics state: Track position independently of React state to avoid frame drops/stutter
   const localPlayerRef = useRef<{ x: number, y: number } | null>(null);
 
 
   // Joystick state
   const joystickRef = useRef<{ x: number, y: number } | null>(null);
+
+  // Knockback State
+  const knockbackRef = useRef<{
+    active: boolean;
+    startX: number;
+    startY: number;
+    targetX: number;
+    targetY: number;
+    startTime: number;
+    duration: number;
+  } | null>(null);
+
+  // Remote Knockbacks (Map of PlayerID -> KnockbackState)
+  const remoteKnockbacksRef = useRef<Record<string, { startX: number, startY: number, targetX: number, targetY: number, startTime: number, duration: number }>>({});
+
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   // UI Visibility (Collapsed by default on mobile)
@@ -231,6 +237,25 @@ function App() {
         newState.players[newSocket.id].x = localPlayerRef.current.x;
         newState.players[newSocket.id].y = localPlayerRef.current.y;
       }
+
+      // REMOTE ANIMATION OVERRIDE
+      // Prevent server state (which might be laggy/stationary) from snapping animating players back
+      const now = Date.now();
+      Object.keys(remoteKnockbacksRef.current).forEach(pid => {
+        const kb = remoteKnockbacksRef.current[pid];
+        if (newState.players[pid]) {
+          const elapsed = now - kb.startTime;
+          if (elapsed < kb.duration) {
+            const t = elapsed / kb.duration;
+            newState.players[pid].x = kb.startX + (kb.targetX - kb.startX) * t;
+            newState.players[pid].y = kb.startY + (kb.targetY - kb.startY) * t;
+          } else {
+            newState.players[pid].x = kb.targetX;
+            newState.players[pid].y = kb.targetY;
+          }
+        }
+      });
+
       setGameState(newState);
       if (newState.chatHistory) {
         setChatMessages(newState.chatHistory);
@@ -256,6 +281,42 @@ function App() {
           }
         };
       });
+    });
+
+    // --- KNOCKBACK LISTENER ---
+    newSocket.on('forceKnockback', (data: { id: string, dx: number, dy: number, duration: number }) => {
+      // We only care if *WE* are the target
+      if (data.id === newSocket.id) {
+        if (localPlayerRef.current) {
+          const startX = localPlayerRef.current.x;
+          const startY = localPlayerRef.current.y;
+          const targetX = startX + data.dx;
+          const targetY = startY + data.dy;
+
+          knockbackRef.current = {
+            active: true,
+            startX,
+            startY,
+            targetX,
+            targetY,
+            startTime: Date.now(),
+            duration: data.duration
+          };
+        }
+      } else {
+        // Remote Player
+        const player = gameStateRef.current.players[data.id];
+        if (player) {
+          remoteKnockbacksRef.current[data.id] = {
+            startX: player.x,
+            startY: player.y,
+            targetX: player.x + data.dx,
+            targetY: player.y + data.dy,
+            startTime: Date.now(),
+            duration: data.duration
+          };
+        }
+      }
     });
 
     // Loading State was here (removed)
@@ -503,30 +564,58 @@ function App() {
 
     const loop = () => {
       animationFrameId = requestAnimationFrame(loop);
+      const now = performance.now();
+      const dt = now - lastTime;
+      lastTime = now;
 
-      const currentTime = performance.now();
-      const dt = currentTime - lastTime;
-      lastTime = currentTime;
-
-      // Cap dt to prevent huge jumps if tab was inactive
+      // Limit dt to avoid wildly huge jumps if tab inactive
       const safeDt = Math.min(dt, 100);
 
-      if (!socketRef.current) return;
+      const myId = socketRef.current?.id;
+      const me = gameStateRef.current.players[myId!];
 
-      const keys = keysPressed.current;
-      const socket = socketRef.current;
-      const myId = socket.id;
+      // Update Remote Animations
+      const remoteIds = Object.keys(remoteKnockbacksRef.current);
+      if (remoteIds.length > 0) {
+        const dateNow = Date.now();
+        const updatedPlayers: Record<string, Partial<Player>> = {};
+        let hasUpdates = false;
 
-      if (!myId) return;
+        remoteIds.forEach(pid => {
+          const kb = remoteKnockbacksRef.current[pid];
+          const elapsed = dateNow - kb.startTime;
 
-      // We need to read the VERY LATEST state from the ref to avoid stale closures
-      const currentState = gameStateRef.current;
-      const me = currentState.players[myId];
+          if (elapsed < kb.duration) {
+            const t = elapsed / kb.duration;
+            updatedPlayers[pid] = {
+              x: kb.startX + (kb.targetX - kb.startX) * t,
+              y: kb.startY + (kb.targetY - kb.startY) * t
+            };
+            hasUpdates = true;
+          } else {
+            // Finish
+            updatedPlayers[pid] = { x: kb.targetX, y: kb.targetY };
+            hasUpdates = true;
+            delete remoteKnockbacksRef.current[pid];
+          }
+        });
+
+        if (hasUpdates) {
+          setGameState(prev => {
+            const newPlayers = { ...prev.players };
+            Object.entries(updatedPlayers).forEach(([pid, pos]) => {
+              if (newPlayers[pid]) {
+                newPlayers[pid] = { ...newPlayers[pid], ...pos };
+              }
+            });
+            return { ...prev, players: newPlayers };
+          });
+        }
+      }
 
       if (!me) return;
 
-      // Initialize or Sync Physics State if stale (e.g. teleported/respawned externally?)
-      // Actually, we generally trust local physics over server for position.
+      // Initialize or Sync Physics State if stale
       if (!localPlayerRef.current) {
         localPlayerRef.current = { x: me.x, y: me.y };
       }
@@ -540,23 +629,58 @@ function App() {
       const SPEED_PER_SEC = 250;
       const moveAmount = SPEED_PER_SEC * (safeDt / 1000);
 
-      if (keys['w']) dy -= moveAmount;
-      if (keys['s']) dy += moveAmount;
-      if (keys['a']) dx -= moveAmount;
-      if (keys['d']) dx += moveAmount;
+      let newX = currentX;
+      let newY = currentY;
+      let moving = false;
 
-      // Joystick override
-      if (joystickRef.current) {
-        const jx = joystickRef.current.x;
-        const jy = joystickRef.current.y;
-        // User confirmed values are -1 to 1.
-        dx += jx * moveAmount;
-        dy -= jy * moveAmount; // Joystick Y is inverted relative to screen coords
+      // KNOCKBACK OVERRIDE
+      if (knockbackRef.current && knockbackRef.current.active) {
+        const kb = knockbackRef.current;
+        const nowMs = Date.now();
+        const elapsed = nowMs - kb.startTime;
+
+        if (elapsed < kb.duration) {
+          // Interpolate
+          const t = elapsed / kb.duration;
+          // Linear interpolation
+          newX = kb.startX + (kb.targetX - kb.startX) * t;
+          newY = kb.startY + (kb.targetY - kb.startY) * t;
+          dx = newX - currentX; // For "moving" check
+          dy = newY - currentY;
+          moving = true;
+        } else {
+          // Finish
+          knockbackRef.current = null;
+          // Force one last sync to target
+          newX = kb.targetX;
+          newY = kb.targetY;
+          moving = true;
+        }
+      } else {
+        // Normal Movement
+        if (keysPressed.current['w']) dy -= moveAmount;
+        if (keysPressed.current['s']) dy += moveAmount;
+        if (keysPressed.current['a']) dx -= moveAmount;
+        if (keysPressed.current['d']) dx += moveAmount;
+
+        // Joystick override
+        if (joystickRef.current) {
+          const jx = joystickRef.current.x;
+          const jy = joystickRef.current.y;
+          // User confirmed values are -1 to 1.
+          dx += jx * moveAmount;
+          dy -= jy * moveAmount; // Joystick Y is inverted relative to screen coords
+        }
+
+        if (dx !== 0 || dy !== 0) {
+          newX = currentX + dx;
+          newY = currentY + dy;
+          moving = true;
+        }
       }
 
-      if (dx !== 0 || dy !== 0) {
-        let newX = currentX + dx;
-        let newY = currentY + dy;
+      if (moving) {
+        // Boundary Checks
 
         // Boundary Checks - Keep within Drawable Area (Canvas 800x600)
         // We ignore the arena shape (Circle/Square) effectively allowing players to run "out of bounds" mechanic-wise,
@@ -572,6 +696,78 @@ function App() {
         const maxWidth = currentPage.config ? (currentPage.config.backgroundImageUrl ? currentPage.config.width : 800) : 800;
         const maxHeight = currentPage.config ? (currentPage.config.backgroundImageUrl ? currentPage.config.height : 600) : 600;
 
+        // --- Collision Detection (Client Side - WASD) ---
+        // Helper: Check if point (px, py) with radius r collides with any solid prop
+        const isColliding = (px: number, py: number): boolean => {
+          const props = gameStateRef.current.simulation.activeProps;
+          const isKnockingBack = !!knockbackRef.current; // Check if we are in knockback state
+
+          for (const p of props) {
+            if (!p.isSolid) continue;
+
+            // If we are being knocked back, and this prop ALLOWS knockbacks, ignore it.
+            if (isKnockingBack && p.allowKnockback) continue;
+
+            if (p.type === 'circle') {
+              const rSum = (p.width || 0) + playerRadius;
+              const diffX = px - p.x;
+              const diffY = py - p.y;
+              if ((diffX * diffX + diffY * diffY) < (rSum * rSum)) return true;
+            } else if (p.type === 'rect') {
+              // Simple AABB for unrotated rects, or rotated logic if needed.
+              // Assuming unrotated for basic demo, or using the same logic as server hit check?
+              // Let's implement Rotated Rect Check for robustness.
+              const halfW = (p.width || 0) / 2;
+              const halfH = (p.height || 0) / 2;
+              // Transform point to local space of rect
+              const rad = -(p.rotation || 0);
+              const dx = px - p.x;
+              const dy = py - p.y;
+              const localX = dx * Math.cos(rad) - dy * Math.sin(rad);
+              const localY = dx * Math.sin(rad) + dy * Math.cos(rad);
+
+              // AABB Check in local space (Inflate rect by player radius roughly? Or just point check?)
+              // Strictly speaking, circle vs rotated rect.
+              // Approximation: Inflate rect by radius.
+              if (
+                localX > -halfW - playerRadius &&
+                localX < halfW + playerRadius &&
+                localY > -halfH - playerRadius &&
+                localY < halfH + playerRadius
+              ) {
+                return true;
+              }
+            }
+          }
+          return false;
+        };
+
+        // Try moving full delta
+        let potentialX = newX;
+        let potentialY = newY;
+
+        // If collision, try sliding (X only, then Y only)
+        if (isColliding(potentialX, potentialY)) {
+          // Try X only
+          if (!isColliding(potentialX, currentY)) {
+            potentialY = currentY;
+          }
+          // Try Y only
+          else if (!isColliding(currentX, potentialY)) {
+            potentialX = currentX;
+          }
+          // Blocked
+          else {
+            potentialX = currentX;
+            potentialY = currentY;
+          }
+        }
+
+        // Finalize
+        newX = potentialX;
+        newY = potentialY;
+
+        // Boundary Check (after collision, to ensure we don't slide out of bounds)
         newX = Math.max(playerRadius, Math.min(newX, maxWidth - playerRadius));
         newY = Math.max(playerRadius, Math.min(newY, maxHeight - playerRadius));
 
@@ -584,7 +780,7 @@ function App() {
           ...prev,
           players: {
             ...prev.players,
-            [myId]: { ...prev.players[myId], x: newX, y: newY }
+            [myId!]: { ...prev.players[myId!], x: newX, y: newY }
           }
         }));
 
@@ -592,10 +788,19 @@ function App() {
         // Optimization: Could throttle network sends to 20-30hz while simulating locally at high FPS.
         const now = performance.now();
         if (now - lastMoveEmit.current > 30) { // ~33 updates per second
-          socket.emit('move', { x: newX, y: newY });
+          socketRef.current?.emit('move', { x: newX, y: newY });
           lastMoveEmit.current = now;
         }
+      } else {
+        // If we JUST stopped moving, send one final update to ensure server has exact position.
+        // Otherwise, the last throttled update might be a few pixels off.
+        if (wasMovingRef.current) {
+          socketRef.current?.emit('move', { x: currentX, y: currentY });
+          lastMoveEmit.current = performance.now();
+        }
       }
+
+      wasMovingRef.current = moving;
     };
 
     loop();
@@ -614,6 +819,7 @@ function App() {
   const [secondaryColor, setSecondaryColor] = useState<number>(0x000000);
   const [customPalette, setCustomPalette] = useState<(number | null)[]>([null, null, null, null, null, null]);
   const [lineWidth, setLineWidth] = useState<number>(3);
+  const [opacity, setOpacity] = useState<number>(1);
   const [tool, setTool] = useState<'select' | 'brush' | 'eraser' | 'line' | 'text' | 'donut' | 'circle' | 'cone' | 'rect'>('brush');
   const [showLoadWarning, setShowLoadWarning] = useState<boolean>(false);
 
@@ -655,6 +861,7 @@ function App() {
   const dragStartRef = useRef<{ x: number, y: number, initialObjects: any } | null>(null); // Snapshot for diffing
   const isDraggingSelectionRef = useRef(false);
   const isBoxSelectingRef = useRef(false);
+
 
 
   const startStroke = (x: number, y: number) => {
@@ -797,7 +1004,8 @@ function App() {
         color: selectedColor,
         width: lineWidth,
         isEraser: false,
-        type: 'line'
+        type: 'line',
+        alpha: opacity
       });
     } else if (tool === 'donut' || tool === 'circle') {
       setShapePreview({ x, y, r: 0 });
@@ -808,7 +1016,8 @@ function App() {
         color: selectedColor,
         width: lineWidth,
         isEraser: false,
-        type: tool
+        type: tool,
+        alpha: opacity
       });
     } else {
       socketRef.current?.emit('startStroke', {
@@ -818,7 +1027,8 @@ function App() {
         color: selectedColor,
         width: lineWidth,
         isEraser: tool === 'eraser',
-        type: 'freehand'
+        type: 'freehand',
+        alpha: opacity
       });
     }
   };
@@ -1039,7 +1249,7 @@ function App() {
           const id = Math.random().toString(36).substr(2, 9);
           const anticlockwise = start.totalRotation < 0;
           socketRef.current?.emit('startStroke', {
-            id, x: start.x, y: start.y, color: selectedColor, width: lineWidth, isEraser: false, type: 'cone', anticlockwise
+            id, x: start.x, y: start.y, color: selectedColor, width: lineWidth, isEraser: false, type: 'cone', anticlockwise, alpha: opacity
           });
           const p1x = start.x + start.r * Math.cos(start.startAngle);
           const p1y = start.y + start.r * Math.sin(start.startAngle);
@@ -1072,7 +1282,8 @@ function App() {
         color: selectedColor,
         width: lineWidth,
         isEraser: false,
-        type: 'rect'
+        type: 'rect',
+        alpha: opacity
       });
       // Emit End Point (Top-Left + Size -> convert to p2)
       // Actually rect uses 2 points like line? Arena logic uses p1 and p2.
@@ -1189,6 +1400,53 @@ function App() {
     reader.readAsText(file);
     // Reset input
     e.target.value = '';
+  };
+
+  // Slider Change Handlers
+  const handleLineWidthChange = (val: number) => {
+    setLineWidth(val);
+    const updates: Partial<Stroke>[] = [];
+
+    // Update active stroke if drawing
+    if (currentStrokeIdRef.current) {
+      updates.push({ id: currentStrokeIdRef.current, width: val });
+    }
+
+    if (selectedIds.length > 0) {
+      const page = gameState.pages[gameState.currentPageIndex];
+      selectedIds.forEach(id => {
+        if (id !== currentStrokeIdRef.current) {
+          const stroke = page.strokes.find(s => s.id === id);
+          if (stroke) {
+            updates.push({ id, width: val });
+          }
+        }
+      });
+    }
+    if (updates.length > 0) socketRef.current?.emit('updateStrokes', { updates });
+  };
+
+  const handleOpacityChange = (val: number) => {
+    setOpacity(val);
+    const updates: Partial<Stroke>[] = [];
+
+    // Update active stroke if drawing
+    if (currentStrokeIdRef.current) {
+      updates.push({ id: currentStrokeIdRef.current, alpha: val });
+    }
+
+    if (selectedIds.length > 0) {
+      const page = gameState.pages[gameState.currentPageIndex];
+      selectedIds.forEach(id => {
+        if (id !== currentStrokeIdRef.current) {
+          const stroke = page.strokes.find(s => s.id === id);
+          if (stroke) {
+            updates.push({ id, alpha: val });
+          }
+        }
+      });
+    }
+    if (updates.length > 0) socketRef.current?.emit('updateStrokes', { updates });
   };
 
   // Debuff Menu State
@@ -1400,6 +1658,11 @@ function App() {
                 onClearLimitCut={handleClearLimitCut}
                 onCountdown={() => socketRef.current?.emit('startCountdown')}
                 onClose={() => setShowConfig(false)}
+                // Simulation
+                simState={gameState.simulation}
+                onStartSim={(id) => socketRef.current?.emit('startSimulation', { timelineId: id })}
+                onStopSim={() => socketRef.current?.emit('stopSimulation')}
+                onResetSim={() => socketRef.current?.emit('resetSimulation')}
               />
             </div>
           </div>
@@ -1689,53 +1952,96 @@ function App() {
               </div>
             </div>
 
-            {/* Brush Size Section */}
+            {/* Brush Size & Opacity Section */}
             <div style={{
               gridArea: 'size',
               display: isMobile ? 'flex' : 'block',
               flexDirection: 'column',
               alignItems: 'center',
-              justifyContent: 'center', // Center vertically in its grid cell
+              justifyContent: 'center',
               borderLeft: isMobile ? '1px solid #444' : 'none',
               paddingLeft: isMobile ? '10px' : '0'
             }}>
-              {!isMobile && <h3 style={{ margin: '0 0 10px', color: '#eee', fontFamily: 'sans-serif', fontSize: '14px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>Brush Size: {lineWidth}px</h3>}
+              {/* Header Removed */}
 
               <div style={{
                 display: 'flex',
-                flexDirection: isMobile ? 'column-reverse' : 'row',
+                flexDirection: 'row',
                 alignItems: 'center',
                 gap: '15px',
                 justifyContent: 'center',
-                height: isMobile ? '100%' : 'auto'
+                height: isMobile ? '100%' : 'auto',
+                width: '100%'
               }}>
-                {/* Slider */}
-                <div style={isMobile ? {
+                <div style={{
                   display: 'flex',
+                  flexDirection: isMobile ? 'row' : 'column',
+                  gap: isMobile ? '10px' : '2px', // Tighter gap on desktop
                   alignItems: 'center',
-                  height: '150px', // REDUCED HEIGHT back to 150px
-                  width: '30px',
-                  position: 'relative'
-                } : { flex: 1 }}>
-                  <input
-                    type="range"
-                    min="1"
-                    max="40"
-                    value={lineWidth}
-                    onChange={(e) => setLineWidth(Number(e.target.value))}
-                    style={isMobile ? {
-                      writingMode: 'vertical-lr',
-                      direction: 'rtl',
-                      width: '30px',
-                      height: '100%',
-                      appearance: 'slider-vertical' as any
-                    } : { width: '100%' }}
-                  />
+                  justifyContent: 'center',
+                  width: '100%',
+                  height: isMobile ? '100%' : '45px', // Fixed height on desktop
+                  flex: 1
+                }}>
+                  {/* Size Slider */}
+                  <div style={isMobile ? {
+                    display: 'flex',
+                    alignItems: 'center',
+                    height: '150px',
+                    width: '30px',
+                    position: 'relative'
+                  } : { flex: 1, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    {!isMobile && <div style={{ color: '#aaa', fontSize: '9px', lineHeight: '9px' }}>Size: {lineWidth}px</div>}
+                    <input
+                      type="range"
+                      min="1"
+                      max="40"
+                      value={lineWidth}
+                      onChange={(e) => handleLineWidthChange(Number(e.target.value))}
+                      title={`Size: ${lineWidth}px`}
+                      style={isMobile ? {
+                        writingMode: 'vertical-lr',
+                        direction: 'rtl',
+                        width: '30px',
+                        height: '100%',
+                        appearance: 'slider-vertical' as any
+                      } : { width: '100%', height: '14px', margin: 0 }}
+                    />
+                  </div>
+
+                  {/* Opacity Slider */}
+                  <div style={isMobile ? {
+                    display: 'flex',
+                    alignItems: 'center',
+                    height: '150px',
+                    width: '30px',
+                    position: 'relative',
+                    marginLeft: '10px'
+                  } : { flex: 1, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    {!isMobile && <div style={{ color: '#aaa', fontSize: '9px', lineHeight: '9px' }}>Opacity: {Math.round(opacity * 100)}%</div>}
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1"
+                      step="0.05"
+                      value={opacity}
+                      onChange={(e) => handleOpacityChange(Number(e.target.value))}
+                      title={`Opacity: ${Math.round(opacity * 100)}%`}
+                      style={isMobile ? {
+                        writingMode: 'vertical-lr',
+                        direction: 'rtl',
+                        width: '30px',
+                        height: '100%',
+                        appearance: 'slider-vertical' as any
+                      } : { width: '100%', height: '14px', margin: 0 }}
+                    />
+                  </div>
                 </div>
+
 
                 {/* Preview Dot */}
                 <div style={{ width: '45px', height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#222', borderRadius: '4px', border: '1px solid #555', flexShrink: 0 }}>
-                  <div style={{ width: lineWidth + 'px', height: lineWidth + 'px', background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'), borderRadius: '50%', border: tool === 'eraser' ? '1px solid #999' : 'none' }} />
+                  <div style={{ width: lineWidth + 'px', height: lineWidth + 'px', background: tool === 'eraser' ? '#fff' : '#' + selectedColor.toString(16).padStart(6, '0'), opacity: tool === 'eraser' ? 1 : opacity, borderRadius: '50%', border: tool === 'eraser' ? '1px solid #999' : 'none' }} />
                 </div>
               </div>
             </div>
@@ -2067,6 +2373,8 @@ function App() {
           myId={socketRef.current?.id}
           config={gameState.pages[gameState.currentPageIndex].config}
           strokes={gameState.pages[gameState.currentPageIndex].strokes}
+          activeProps={gameState.simulation?.activeProps}
+          boss={gameState.simulation?.boss}
           onStrokeStart={startStroke}
           onStrokeMove={moveStroke}
           onStrokeEnd={endStroke}
@@ -2080,6 +2388,7 @@ function App() {
           currentTool={tool}
           currentColor={selectedColor}
           currentWidth={lineWidth}
+          currentOpacity={opacity}
           selectionBox={selectionBox}
           selectedIds={selectedIds}
           rectPreview={rectPreview}
@@ -2129,6 +2438,7 @@ function App() {
             }}
           />
         )}
+        <CastBar simState={gameState.simulation} scale={scale} />
       </div>
 
       {

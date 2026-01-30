@@ -1,4 +1,5 @@
-import type { ArenaConfig } from '../types';
+import { useState } from 'react';
+import type { ArenaConfig, SimulationState } from '../types';
 
 interface ConfigMenuProps {
     config: ArenaConfig;
@@ -9,9 +10,17 @@ interface ConfigMenuProps {
     onClearLimitCut: () => void;
     onCountdown: () => void;
     onClose?: () => void;
+    // Simulation
+    onStartSim: (timelineId: string) => void;
+    onStopSim: () => void;
+    onResetSim: () => void;
+    simState?: SimulationState;
 }
 
-const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onCountdown, onClose }: ConfigMenuProps) => {
+const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onCountdown, onClose, onStartSim, onStopSim, onResetSim, simState }: ConfigMenuProps) => {
+    // Local state for selected timeline
+    const [selectedTimeline, setSelectedTimeline] = useState('arena_split');
+
     return (
         <div style={{
             backgroundColor: 'rgba(30, 30, 30, 0.9)',
@@ -60,6 +69,7 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                     <option value="waymarks-2">Waymarks 2</option>
                     <option value="waymarks-3">Waymarks 3</option>
                     <option value="waymarks-4">Waymarks 4</option>
+                    <option value="arena-split-outer">Arena Split Outer Markers</option>
                 </select>
             </div>
 
@@ -167,6 +177,98 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                 >
                     Countdown
                 </button>
+            </div>
+
+            <hr style={{ border: 'none', borderTop: '1px solid #444', margin: '15px 0' }} />
+
+            <div style={{ marginBottom: '10px' }}>
+                <h4 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#aaa' }}>Mechanic Sim</h4>
+                <div style={{ marginBottom: '10px' }}>
+                    <label style={{ marginRight: '10px', fontSize: '12px' }}>Timeline:</label>
+                    <select
+                        value={selectedTimeline}
+                        onChange={(e) => setSelectedTimeline(e.target.value)}
+                        style={{ padding: '4px', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555', width: '100%' }}
+                    >
+
+                        <option value="arena_split">Arena Split</option>
+                    </select>
+                </div>
+                {simState?.isRunning ? (
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            onClick={onStopSim}
+                            style={{
+                                flex: 2,
+                                background: '#d9534f',
+                                border: '1px solid #d43f3a',
+                                color: 'white',
+                                padding: '5px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontFamily: "'Outfit', sans-serif",
+                                fontSize: '12px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                        >
+                            Stop
+                        </button>
+                        <button
+                            onClick={onResetSim}
+                            style={{
+                                flex: 1,
+                                background: '#f0ad4e',
+                                border: '1px solid #eea236',
+                                color: 'white',
+                                padding: '5px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontFamily: "'Outfit', sans-serif",
+                                fontSize: '12px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                        >
+                            Reset
+                        </button>
+                    </div>
+                ) : (
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <button
+                            onClick={() => onStartSim(selectedTimeline)}
+                            style={{
+                                flex: 1,
+                                background: '#5cb85c',
+                                border: '1px solid #4cae4c',
+                                color: 'white',
+                                padding: '5px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontFamily: "'Outfit', sans-serif",
+                                fontSize: '12px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                        >
+                            Play
+                        </button>
+                        <button
+                            onClick={onResetSim}
+                            style={{
+                                flex: 1,
+                                background: '#777',
+                                border: '1px solid #555',
+                                color: '#ccc',
+                                padding: '5px',
+                                borderRadius: '4px',
+                                cursor: 'pointer', // Allowed to reset to clear clutter
+                                fontFamily: "'Outfit', sans-serif",
+                                fontSize: '12px',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                            }}
+                        >
+                            Reset
+                        </button>
+                    </div>
+                )}
             </div>
         </div >
     );

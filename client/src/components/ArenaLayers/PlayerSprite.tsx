@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from '@pixi/react';
+import { Container, Graphics, Text, Sprite } from '@pixi/react';
 import * as PIXI from 'pixi.js';
 import React, { useCallback } from 'react';
 import type { Player } from '../../types';
@@ -46,10 +46,38 @@ const PlayerSprite = React.memo(({ player, isMe, isHonking }: PlayerSpriteProps)
     // However, keeping layout logic simple is also good.
     // Let's stick to the structure but use useCallback where possible.
 
+    const hasArrow = player.debuffs && player.debuffs.includes(99);
+
     return (
         <Container x={player.x} y={player.y}>
             {!isSpectator && (
                 <Graphics draw={drawPlayer} />
+            )}
+
+            {/* Red Arrow Marker (Debuff 99) */}
+            {hasArrow && (
+                <Sprite
+                    image="/red_arrow_down.svg"
+                    anchor={0.5}
+                    width={40}
+                    height={40}
+                    y={-50}
+                    alpha={1}
+                />
+            )}
+
+            {/* Damage Debuff (Skull) (Debuff 1) */}
+            {player.debuffs && player.debuffs.includes(1) && (
+                <Text
+                    text="☠️"
+                    anchor={0.5}
+                    x={0}
+                    y={-40} // Position it slightly differently or overlapping? Arrow is -50.
+                    style={new PIXI.TextStyle({
+                        fontSize: 24,
+                        fill: ['#ffffff'], // Not really used for emoji but good practice
+                    })}
+                />
             )}
 
             {/* Debuffs */}
@@ -58,11 +86,15 @@ const PlayerSprite = React.memo(({ player, isMe, isHonking }: PlayerSpriteProps)
                     <Graphics
                         draw={useCallback((g: PIXI.Graphics) => {
                             g.clear();
-                            const count = player.debuffs.length;
+                            // Filter out 99 (Arrow), 1 (Skull), and 2 (Invisible Vuln)
+                            const visibleDebuffs = player.debuffs.filter(d => d !== 99 && d !== 1 && d !== 2);
+                            if (visibleDebuffs.length === 0) return;
+
+                            const count = visibleDebuffs.length;
                             const spacing = 12;
                             const startX = -((count - 1) * spacing) / 2;
 
-                            player.debuffs.forEach((colorVal, i) => {
+                            visibleDebuffs.forEach((colorVal, i) => {
                                 let finalColor = typeof colorVal === 'number' ? colorVal : parseInt(colorVal as any, 16);
                                 if (isNaN(finalColor)) finalColor = 0xFFFFFF;
 

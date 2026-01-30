@@ -136,6 +136,25 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
                                         />
                                     );
                                 })}
+
+                                {/* Special Marker: Red Arrow (ID 99) */}
+                                <div
+                                    key={99}
+                                    onClick={() => toggleDebuff(player.id, 99)}
+                                    title="Red Arrow Marker"
+                                    style={{
+                                        width: '24px',
+                                        height: '24px',
+                                        borderRadius: '4px',
+                                        border: localDebuffs[player.id]?.includes(99) ? '2px solid white' : '1px solid #333',
+                                        background: localDebuffs[player.id]?.includes(99) ? '#444' : '#222',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        cursor: 'pointer',
+                                        opacity: localDebuffs[player.id]?.includes(99) ? 1 : 0.6
+                                    }}
+                                >
+                                    <img src="/red_arrow_down.svg" style={{ width: '16px', height: '16px' }} />
+                                </div>
                             </div>
                         </div>
                     </div>
