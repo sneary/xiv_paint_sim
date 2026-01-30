@@ -131,7 +131,7 @@ export class SimulationEngine {
                         const dist = Math.hypot(player.x - p.x, player.y - p.y);
                         // Logic: < 560 is BAD (Red), >= 560 is GOOD (Green)
                         if (dist < 575) {
-                            console.log(`[Sim] Tether Failed (Dist: ${dist.toFixed(0)} < 560). Damage!`);
+                            console.log(`[Sim] Tether Failed (Dist: ${dist.toFixed(0)} < 575). Damage!`);
                             const currentDebuffs = player.debuffs || [];
                             let history = player.debuffHistory || [];
 
@@ -143,7 +143,7 @@ export class SimulationEngine {
                                     id: 1,
                                     source: p.name || 'Tether (Too Short)',
                                     timestamp: Date.now()
-                                }];
+                                }].slice(-20).slice(-20); // Keep last 20 entries
                                 this.onApplyDebuff(player.id, [...currentDebuffs, 1], newHistory);
                             }
                         } else {
@@ -197,7 +197,7 @@ export class SimulationEngine {
                                     id: p.applyDebuffIdOnExpiration,
                                     source: p.name || 'Unknown',
                                     timestamp: Date.now()
-                                }];
+                                }].slice(-20).slice(-20);
 
                                 currentDebuffs = [...currentDebuffs, p.applyDebuffIdOnExpiration];
                                 debuffsChanged = true;
