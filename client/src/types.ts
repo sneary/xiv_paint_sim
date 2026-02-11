@@ -14,6 +14,7 @@ export interface Player {
     debuffs: number[];
     debuffHistory?: DebuffEntry[];
     limitCut?: number;
+    sessionId?: string; // For reconnection persistence
 }
 
 export interface Point {

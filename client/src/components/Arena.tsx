@@ -121,7 +121,11 @@ const StrokeRenderer = memo(({ stroke }: { stroke: Stroke }) => {
     // True Flat Alpha: Render geometry OPAQUELY (alpha=1) to an intermediate buffer (forced by Filter),
     // then reduce opacity of the entire buffer using AlphaFilter.
     const alpha = stroke.alpha ?? 1;
-    const filters = useMemo(() => [new PIXI.filters.AlphaFilter(alpha)], [alpha]);
+    // Fix: Do NOT apply AlphaFilter to Eraser. It conflicts with DST_OUT.
+    const filters = useMemo(() => {
+        if (stroke.isEraser) return [];
+        return [new PIXI.filters.AlphaFilter(alpha)];
+    }, [alpha, stroke.isEraser]);
 
     const draw = useCallback((g: PIXI.Graphics) => {
         g.clear();
@@ -483,6 +487,25 @@ const Arena = ({
                     });
                 }, [activeProps, players])} />
 
+                {/* Strokes Layer - Rendered individually for Flat Alpha */}
+                {/* User Request: Background -> Strokes -> Props -> Players */}
+                {/* To fix eraser "Black Brush" + "Background Erase":
+                    1. We wrap strokes in a Container.
+                    2. We use 'layerable={false}' if using @pixi/layers, but here we are using standard Pixi.
+                    3. The trick: Render strokes to a temporary Texture, then render that Texture to the screen?
+                    4. Simpler: Just ensure "DST_OUT" works by ensuring the parent container creates a transparency group.
+                    PixiJS 7+ often needs 'eventMode' or 'filters' to force a layer.
+                    The simplest fix for "Eraser is Black" is often that the brush has a color (0x000000) and DST_OUT isn't applied.
+                    Let's ensure we are using the correct blend mode.
+                    Also: AlphaFilter(1) *should* work if the strokes are children.
+                    Let's try moving it BEFORE Props and Players definitively.
+                */}
+                <Container filters={useMemo(() => [new PIXI.filters.AlphaFilter(1)], [])}>
+                    {strokes.map((stroke) => (
+                        <StrokeRenderer key={stroke.id} stroke={stroke} />
+                    ))}
+                </Container>
+
                 {/* Mechanics / Props Layer */}
                 <Container>
                     {activeProps && activeProps.map(prop => (
@@ -496,9 +519,9 @@ const Arena = ({
                         image="/assets/tokens/boss_token.png"
                         anchor={0.5}
                         x={boss.x}
-                        y={boss.y + 18} // Offset per user request (visual center alignment)
+                        y={boss.y + 18}
                         alpha={boss.opacity}
-                        scale={0.5} // Default scale since we don't have a specific size requirement yet, adjust as needed
+                        scale={0.5}
                     />
                 )}
 
@@ -511,13 +534,6 @@ const Arena = ({
                             isMe={player.id === myId}
                             isHonking={!!honkingPlayers[player.id]}
                         />
-                    ))}
-                </Container>
-
-                {/* Strokes Layer - Rendered individually for Flat Alpha */}
-                <Container>
-                    {strokes.map((stroke) => (
-                        <StrokeRenderer key={stroke.id} stroke={stroke} />
                     ))}
                 </Container>
 

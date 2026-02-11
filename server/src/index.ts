@@ -103,7 +103,8 @@ io.on('connection', (socket: Socket) => {
         color: number,
         role: 'tank' | 'healer' | 'dps' | 'spectator',
         x?: number,
-        y?: number
+        y?: number,
+        sessionId?: string
     }) => {
         let roomId = data.roomId?.toUpperCase();
 
@@ -155,20 +156,32 @@ io.on('connection', (socket: Socket) => {
         // Validate Name/Color Uniqueness within the ROOM (Only for Joining)
         const gameState = rooms[roomId!]; // Ensure gameState is available in scope
 
-        if (data.action === 'join') {
-            const players = Object.values(gameState.players);
+        let recoveredPlayerId: string | undefined;
 
-            const nameTaken = players.some(p => p.name.toLowerCase() === data.name.toLowerCase());
-            if (nameTaken) {
-                socket.emit('joinError', 'Name is already taken in this room');
-                return;
+        if (data.action === 'join') {
+            // Check for reconnection via sessionId
+            if (data.sessionId) {
+                const existingPlayerId = Object.keys(gameState.players).find(pid => gameState.players[pid].sessionId === data.sessionId);
+                if (existingPlayerId) {
+                    recoveredPlayerId = existingPlayerId;
+                    console.log(`Recovering session for ${data.name} (${recoveredPlayerId}) -> New Socket ${socket.id}`);
+                }
             }
 
-            if (data.role !== 'spectator') {
-                const colorTaken = players.some(p => p.role !== 'spectator' && p.color === data.color);
-                if (colorTaken) {
-                    socket.emit('joinError', 'Color is already taken in this room');
+            if (!recoveredPlayerId) {
+                const players = Object.values(gameState.players);
+                const nameTaken = players.some(p => p.name.toLowerCase() === data.name.toLowerCase());
+                if (nameTaken) {
+                    socket.emit('joinError', 'Name is already taken in this room');
                     return;
+                }
+
+                if (data.role !== 'spectator') {
+                    const colorTaken = players.some(p => p.role !== 'spectator' && p.color === data.color);
+                    if (colorTaken) {
+                        socket.emit('joinError', 'Color is already taken in this room');
+                        return;
+                    }
                 }
             }
         }
@@ -178,17 +191,34 @@ io.on('connection', (socket: Socket) => {
         socket.join(currentRoomId);
         socket.data.name = data.name;
 
-        // Add Player
-        gameState.players[socket.id] = {
-            id: socket.id,
-            // Seamless Reconnect: Use provided position if available (and valid-ish), else default
-            x: (data.x !== undefined && data.y !== undefined) ? data.x : 400,
-            y: (data.x !== undefined && data.y !== undefined) ? data.y : 300,
-            color: data.color || 0xffffff,
-            name: data.name,
-            role: data.role || 'dps',
-            debuffs: []
-        };
+        if (recoveredPlayerId) {
+            // RECOVER STATE
+            const oldPlayer = gameState.players[recoveredPlayerId];
+
+            // Delete old entry
+            delete gameState.players[recoveredPlayerId];
+
+            // Create NEW entry with OLD data but NEW ID
+            gameState.players[socket.id] = {
+                ...oldPlayer,
+                id: socket.id, // Update to new socket ID
+                // Keep name/color/role/debuffs/x/y from old session
+                sessionId: data.sessionId
+            };
+        } else {
+            // NEW PLAYER
+            gameState.players[socket.id] = {
+                id: socket.id,
+                // Seamless Reconnect: Use provided position if available (and valid-ish), else default
+                x: (data.x !== undefined && data.y !== undefined) ? data.x : 400,
+                y: (data.x !== undefined && data.y !== undefined) ? data.y : 300,
+                color: data.color || 0xffffff,
+                name: data.name,
+                role: data.role || 'dps',
+                debuffs: [],
+                sessionId: data.sessionId
+            };
+        }
 
         // Ensure state is valid (if legacy cleanup needed, though new rooms use new init)
         if (!gameState.pages) {

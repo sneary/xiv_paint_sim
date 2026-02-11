@@ -12,8 +12,9 @@ export interface Player {
     name: string;
     role: 'tank' | 'healer' | 'dps' | 'spectator';
     debuffs: number[];
-    debuffHistory?: DebuffEntry[];
+    debuffHistory?: any[]; // Keep flexible
     limitCut?: number;
+    sessionId?: string;
 }
 
 export interface ArenaConfig {

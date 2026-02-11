@@ -90,7 +90,6 @@ function App() {
   // Fix Mobile Scroll/Drift
   // Fix Mobile Scroll/Drift
   useEffect(() => {
-    // Only handle resize for scaling, do NOT force scroll reset loop
     const handleResize = () => {
       const mobile = window.innerWidth <= 768;
       setIsMobile(mobile);
@@ -110,7 +109,14 @@ function App() {
       window.visualViewport.addEventListener('resize', handleResize);
     }
 
-    handleResize(); // Init
+    // Initial call
+    handleResize();
+
+    // Persistence: Initialize Session ID
+    const storedSessionId = localStorage.getItem('sessionId');
+    if (!storedSessionId) {
+      localStorage.setItem('sessionId', Math.random().toString(36).substring(2) + Date.now().toString(36));
+    }
 
     return () => {
       window.removeEventListener('resize', handleResize);
