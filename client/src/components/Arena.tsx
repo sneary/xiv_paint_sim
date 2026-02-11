@@ -571,15 +571,7 @@ const Arena = ({
                 {/* Selection Overlay */}
                 <Graphics draw={drawSelection} />
 
-                {/* Players */}
-                {Object.values(players).map((player) => (
-                    <PlayerSprite
-                        key={player.id}
-                        player={player}
-                        isMe={player.id === myId}
-                        isHonking={!!honkingPlayers[player.id]}
-                    />
-                ))}
+
             </Container>
         </Stage>
     );

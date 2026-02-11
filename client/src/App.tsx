@@ -160,6 +160,80 @@ function App() {
     }
   };
 
+  const handleGrotesquerieAct2 = () => {
+    if (!socketRef.current) return;
+
+    // Logic ported from DebuffMenu.tsx
+    const players = gameState.players;
+    const allPlayers = Object.values(players);
+    const thGroup: Player[] = [];
+    const dpsGroup: Player[] = [];
+
+    // Best effort role sorting
+    allPlayers.forEach(p => {
+      if (p.role === 'tank' || p.role === 'healer') {
+        thGroup.push(p);
+      } else if (p.role === 'dps') {
+        dpsGroup.push(p);
+      } else {
+        dpsGroup.push(p);
+      }
+    });
+
+    // Determine Alpha/Beta groups
+    const groups = [thGroup, dpsGroup];
+    const alphaIndex = Math.floor(Math.random() * groups.length);
+    const alphaGroup = groups[alphaIndex];
+    const betaGroup = groups[alphaIndex === 0 ? 1 : 0];
+
+    // IDs
+    const ID_ALPHA = 105;
+    const ID_BETA = 106;
+    const ID_1 = 101;
+    const ID_2 = 102;
+    const ID_3 = 103;
+    const ID_4 = 104;
+    const NUMBERS = [ID_1, ID_2, ID_3, ID_4];
+
+    const updates: Record<string, number[]> = {};
+
+    // Helper to shuffle
+    const shuffle = <T,>(array: T[]): T[] => {
+      const arr = [...array];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    };
+
+    const processGroup = (group: Player[], greekId: number) => {
+      const shuffledPlayers = shuffle(group);
+      // Shuffle numbers so that a small group doesn't always get 1, 2...
+      const shuffledNumbers = shuffle([...NUMBERS]);
+
+      shuffledPlayers.forEach((p, i) => {
+        const numId = i < 4 ? shuffledNumbers[i] : undefined;
+        const db: number[] = [];
+        if (numId) db.push(numId);
+        db.push(greekId);
+        updates[p.id] = db;
+      });
+    };
+
+    processGroup(alphaGroup, ID_ALPHA);
+    processGroup(betaGroup, ID_BETA);
+
+    // Apply instantly
+    // We only send updates for players that changed? Or all?
+    // updateDebuffs expects a map of ALL debuffs to overwrite, 
+    // OR just updates? Server implementation usually merges or overwrites.
+    // Based on handleClearDebuffs above, it seems we send { id: [] } to clear.
+    // So we should send { id: [new_mechanics] } for everyone involved.
+    // Since we iterate allPlayers to build groups, 'updates' covers everyone in the room.
+    socketRef.current.emit('updateDebuffs', updates);
+  };
+
   const handleLimitCut = () => {
     socketRef.current?.emit('limitCut');
   };
@@ -1652,17 +1726,17 @@ function App() {
               <ConfigMenu
                 config={gameState.pages[gameState.currentPageIndex].config}
                 onUpdate={handleConfigUpdate}
-                onSetDebuffs={() => setShowDebuffMenu(true)}
+                onSetDebuffs={() => setShowDebuffMenu(true)} // Re-open tools if needed, mainly for debuff menu
                 onClearDebuffs={handleClearDebuffs}
                 onLimitCut={handleLimitCut}
                 onClearLimitCut={handleClearLimitCut}
-                onCountdown={() => socketRef.current?.emit('startCountdown')}
-                onClose={() => setShowConfig(false)}
-                // Simulation
+                onCountdown={() => socketRef.current?.emit('countdown', 15)}
+                onStartSim={(tid) => socketRef.current?.emit('startSim', tid)}
+                onStopSim={() => socketRef.current?.emit('stopSim')}
+                onResetSim={() => socketRef.current?.emit('resetSim')}
                 simState={gameState.simulation}
-                onStartSim={(id) => socketRef.current?.emit('startSimulation', { timelineId: id })}
-                onStopSim={() => socketRef.current?.emit('stopSimulation')}
-                onResetSim={() => socketRef.current?.emit('resetSimulation')}
+                onClose={() => setShowConfig(false)}
+                onGrotesquerieAct2={handleGrotesquerieAct2}
               />
             </div>
           </div>

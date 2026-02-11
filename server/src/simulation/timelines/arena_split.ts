@@ -314,24 +314,24 @@ export const ARENA_SPLIT_TIMELINE: ScriptedEvent[] = [
                 // Config A: Left (Outer), Right (Inner)
                 [
                     // Left 1 (Top)
-                    { type: 'rect', x: 134, y: 71, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 19000, name: 'Tether' },
+                    { type: 'rect', x: 134, y: 71, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 21000, name: 'Tether' },
                     // Left 4 (Bottom)
-                    { type: 'rect', x: 134, y: 502, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 19000, name: 'Tether' },
+                    { type: 'rect', x: 134, y: 502, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 21000, name: 'Tether' },
                     // Right 2 (Mid-Top)
-                    { type: 'rect', x: 890, y: 215, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 19000, name: 'Tether' },
+                    { type: 'rect', x: 890, y: 215, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 21000, name: 'Tether' },
                     // Right 3 (Mid-Bottom)
-                    { type: 'rect', x: 890, y: 358, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 19000, name: 'Tether' },
+                    { type: 'rect', x: 890, y: 358, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 21000, name: 'Tether' },
                 ],
                 // Config B: Left (Inner), Right (Outer)
                 [
                     // Left 2 (Mid-Top)
-                    { type: 'rect', x: 134, y: 215, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 19000, name: 'Tether' },
+                    { type: 'rect', x: 134, y: 215, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 21000, name: 'Tether' },
                     // Left 3 (Mid-Bottom)
-                    { type: 'rect', x: 134, y: 358, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 19000, name: 'Tether' },
+                    { type: 'rect', x: 134, y: 358, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 21000, name: 'Tether' },
                     // Right 1 (Top)
-                    { type: 'rect', x: 890, y: 71, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 19000, name: 'Tether' },
+                    { type: 'rect', x: 890, y: 71, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 21000, name: 'Tether' },
                     // Right 4 (Bottom)
-                    { type: 'rect', x: 890, y: 502, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 19000, name: 'Tether' },
+                    { type: 'rect', x: 890, y: 502, width: 15, height: 140, color: 0xFFFFFF, alpha: 0.5, duration: 21000, name: 'Tether' },
                 ]
             ]
         }

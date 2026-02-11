@@ -122,18 +122,69 @@ const PartyList: React.FC<PartyListProps> = ({ players, myId }) => {
                                 transform: 'translateY(-50%)',
                                 marginLeft: '10px'
                             }}>
-                                {player.debuffs.map((color, i) => (
-                                    <div
-                                        key={i}
-                                        style={{
-                                            width: '12px',
-                                            height: '12px',
-                                            borderRadius: '50%',
-                                            backgroundColor: '#' + color.toString(16).padStart(6, '0'),
-                                            border: '1px solid #000'
-                                        }}
-                                    />
-                                ))}
+                                {player.debuffs.map((val, i) => {
+                                    // Check for New Debuffs (101-106)
+                                    // TODO: Centralize these definitions
+                                    const NEW_DEBUFFS = [
+                                        { id: 101, img: '/assets/debuffs/debuff_1_I.png' },
+                                        { id: 102, img: '/assets/debuffs/debuff_2_II.png' },
+                                        { id: 103, img: '/assets/debuffs/debuff_3_III.png' },
+                                        { id: 104, img: '/assets/debuffs/debuff_4_IV.png' },
+                                        { id: 105, img: '/assets/debuffs/debuff_5_alpha.png' },
+                                        { id: 106, img: '/assets/debuffs/debuff_6_beta.png' }
+                                    ];
+                                    const debuffDef = NEW_DEBUFFS.find(d => d.id === val);
+
+                                    if (debuffDef) {
+                                        return (
+                                            <div
+                                                key={i}
+                                                style={{
+                                                    width: '24px',
+                                                    height: '24px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center'
+                                                }}
+                                            >
+                                                <img
+                                                    src={debuffDef.img}
+                                                    alt="debuff"
+                                                    style={{
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'contain'
+                                                    }}
+                                                />
+                                            </div>
+                                        );
+                                    }
+
+                                    // Special Case: Arrow (99) -> Ignore or render? 
+                                    // Usually markers don't show in party list, but user didn't specify.
+                                    // Existing code showed it as a dot color if it wasn't filtered.
+                                    // 99 is often handled separately. Let's ignore it for now or check current behavior.
+                                    // Current behavior: `player.debuffs.map((color, i) => ... div bg=color ...)`
+                                    // If val is 99, `color.toString(16)` might be weird if it's supposed to be a color.
+                                    // In `active_debuffs`, 99 is just a number. 
+                                    // If we treat it as a color, 99 decimal is #000063 (dark blue).
+                                    // Let's keep existing behavior for non-matched IDs (render as dot), 
+                                    // but maybe filter 99 if it shouldn't be there? 
+                                    // For now, preservation is safest unless requested.
+
+                                    return (
+                                        <div
+                                            key={i}
+                                            style={{
+                                                width: '12px',
+                                                height: '12px',
+                                                borderRadius: '50%',
+                                                backgroundColor: '#' + val.toString(16).padStart(6, '0'),
+                                                border: '1px solid #000'
+                                            }}
+                                        />
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

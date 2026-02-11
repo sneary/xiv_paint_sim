@@ -15,9 +15,10 @@ interface ConfigMenuProps {
     onStopSim: () => void;
     onResetSim: () => void;
     simState?: SimulationState;
+    onGrotesquerieAct2: () => void;
 }
 
-const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onCountdown, onClose, onStartSim, onStopSim, onResetSim, simState }: ConfigMenuProps) => {
+const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut, onClearLimitCut, onCountdown, onClose, onStartSim, onStopSim, onResetSim, simState, onGrotesquerieAct2 }: ConfigMenuProps) => {
     // Local state for selected timeline
     const [selectedTimeline, setSelectedTimeline] = useState('arena_split');
 
@@ -176,6 +177,24 @@ const ConfigMenu = ({ config, onUpdate, onSetDebuffs, onClearDebuffs, onLimitCut
                     }}
                 >
                     Countdown
+                </button>
+                <button
+                    onClick={onGrotesquerieAct2}
+                    style={{
+                        gridColumn: 'span 2',
+                        background: '#444',
+                        border: '1px solid #666',
+                        color: '#eee',
+                        padding: '5px 10px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontFamily: "'Outfit', sans-serif",
+                        fontSize: '12px',
+                        height: '32px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                >
+                    Grotesquerie: Act 2
                 </button>
             </div>
 

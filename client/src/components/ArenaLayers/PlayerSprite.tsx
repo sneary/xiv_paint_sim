@@ -48,6 +48,15 @@ const PlayerSprite = React.memo(({ player, isMe, isHonking }: PlayerSpriteProps)
 
     const hasArrow = player.debuffs && player.debuffs.includes(99);
 
+    const NEW_DEBUFFS = [
+        { id: 101, img: '/assets/debuffs/debuff_1_I.png' },
+        { id: 102, img: '/assets/debuffs/debuff_2_II.png' },
+        { id: 103, img: '/assets/debuffs/debuff_3_III.png' },
+        { id: 104, img: '/assets/debuffs/debuff_4_IV.png' },
+        { id: 105, img: '/assets/debuffs/debuff_5_alpha.png' },
+        { id: 106, img: '/assets/debuffs/debuff_6_beta.png' }
+    ];
+
     return (
         <Container x={player.x} y={player.y}>
             {!isSpectator && (
@@ -65,6 +74,58 @@ const PlayerSprite = React.memo(({ player, isMe, isHonking }: PlayerSpriteProps)
                     alpha={1}
                 />
             )}
+
+            {/* New Debuffs (101-106) */}
+            {/* New Debuffs (101-106) */}
+            <Container y={-65}>
+                {(() => {
+                    const activeNewDebuffs = player.debuffs
+                        ? player.debuffs
+                            .map(dId => NEW_DEBUFFS.find(d => d.id === dId))
+                            .filter((d): d is typeof NEW_DEBUFFS[0] => !!d)
+                        : [];
+
+                    if (activeNewDebuffs.length === 0) return null;
+
+                    const height = 32;
+                    // We don't know the aspect ratio, but assuming roughly 1:1 or similar.
+                    // Providing only height to Sprite should maintain aspect ratio if width is undefined?
+                    // React-Pixi Sprite might default width to original if not provided? 
+                    // Let's try passing ONLY height. If that fails, we might need a fixed width.
+                    // The user said "maintain original proportions". 
+                    // If we only set height, Pixi usually scales width proportionally.
+                    // Let's assume a width of 32 for spacing calculations, even if actual width varies.
+                    const spacing = 36;
+                    const totalWidth = (activeNewDebuffs.length - 1) * spacing;
+                    const startX = -totalWidth / 2;
+
+                    return activeNewDebuffs.map((def, i) => (
+                        <Sprite
+                            key={def.id}
+                            image={def.img}
+                            anchor={0.5}
+                            height={height}
+                            // Do NOT set width to prevent stretching. 
+                            // However, we need to ensure the anchor works correctly with scaling.
+                            // If we don't set width, and the original is large, it might be huge but scaled down by height?
+                            // Actually, if we set height, the scale.y is refined. If we don't set width, scale.x remains 1. 
+                            // This would DISTORT the image (squash/stretch).
+                            // To maintain aspect ratio in Pixi when setting one dimension, we typically need to set scale, not dimension.
+                            // BUT, since we can't easily get the texture ratio here without loading it, 
+                            // a common trick is to not set width/height but set scale. But we don't know the source size.
+                            //
+                            // WAIT: If we use the `scale` prop, we can set it to a fixed value.
+                            // The cropped images are approx 78x95. 
+                            // if we want height 32, scale should be ~0.33.
+                            // Let's try using a fixed scale of 0.35 which should make them roughly 30px high.
+                            scale={{ x: 0.35, y: 0.35 }}
+                            x={startX + i * spacing}
+                            y={0}
+                            alpha={1}
+                        />
+                    ));
+                })()}
+            </Container>
 
             {/* Damage Debuff (Skull) (Debuff 1) */}
             {player.debuffs && player.debuffs.includes(1) && (
@@ -86,8 +147,10 @@ const PlayerSprite = React.memo(({ player, isMe, isHonking }: PlayerSpriteProps)
                     <Graphics
                         draw={useCallback((g: PIXI.Graphics) => {
                             g.clear();
-                            // Filter out 99 (Arrow), 1 (Skull), and 2 (Invisible Vuln)
-                            const visibleDebuffs = player.debuffs.filter(d => d !== 99 && d !== 1 && d !== 2);
+                            // Filter out 99 (Arrow), 1 (Skull), 2 (Invisible Vuln), and 101-106
+                            const visibleDebuffs = player.debuffs.filter(d =>
+                                d !== 99 && d !== 1 && d !== 2 && !(d >= 101 && d <= 106)
+                            );
                             if (visibleDebuffs.length === 0) return;
 
                             const count = visibleDebuffs.length;

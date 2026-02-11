@@ -13,6 +13,15 @@ const DEBUFF_COLORS = [
     0xff00ff, 0x00ffff, 0xffffff, 0xFFA500 // Orange
 ];
 
+const NEW_DEBUFFS = [
+    { id: 101, img: '/assets/debuffs/debuff_1_I.png', name: 'Limit Cut I' },
+    { id: 102, img: '/assets/debuffs/debuff_2_II.png', name: 'Limit Cut II' },
+    { id: 103, img: '/assets/debuffs/debuff_3_III.png', name: 'Limit Cut III' },
+    { id: 104, img: '/assets/debuffs/debuff_4_IV.png', name: 'Limit Cut IV' },
+    { id: 105, img: '/assets/debuffs/debuff_5_alpha.png', name: 'Alpha' },
+    { id: 106, img: '/assets/debuffs/debuff_6_beta.png', name: 'Beta' }
+];
+
 const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) => {
     // Local state to track changes before applying
     const [localDebuffs, setLocalDebuffs] = useState<Record<string, number[]>>(() => {
@@ -51,6 +60,8 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
         onApply(localDebuffs, localLimitCuts, useCountdown);
         onClose();
     };
+
+
 
     return (
         <div style={{
@@ -155,6 +166,27 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
                                 >
                                     <img src="/red_arrow_down.svg" style={{ width: '16px', height: '16px' }} />
                                 </div>
+
+                                {/* New Debuffs (101-106) */}
+                                {NEW_DEBUFFS.map(d => (
+                                    <div
+                                        key={d.id}
+                                        onClick={() => toggleDebuff(player.id, d.id)}
+                                        title={d.name}
+                                        style={{
+                                            width: '24px',
+                                            height: '24px',
+                                            borderRadius: '4px',
+                                            border: localDebuffs[player.id]?.includes(d.id) ? '2px solid white' : '1px solid #333',
+                                            background: localDebuffs[player.id]?.includes(d.id) ? '#444' : '#222',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            cursor: 'pointer',
+                                            opacity: localDebuffs[player.id]?.includes(d.id) ? 1 : 0.6
+                                        }}
+                                    >
+                                        <img src={d.img} style={{ width: '20px', height: '20px', objectFit: 'contain' }} />
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -206,6 +238,8 @@ const DebuffMenu: React.FC<DebuffMenuProps> = ({ players, onApply, onClose }) =>
                     Countdown
                 </button>
             </div>
+
+
         </div>
     );
 };
