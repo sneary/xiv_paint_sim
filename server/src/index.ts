@@ -513,83 +513,68 @@ io.on('connection', (socket: Socket) => {
 
             socket.emit('importProgress', { current: 0, total: 0, status: 'Navigating to RaidPlan...' });
 
-            await page.goto(url, { waitUntil: 'networkidle0', timeout: 60000 });
+            // Use domcontentloaded to avoid timeouts on long-lived connections (like websockets or ads)
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-            // Strategy 1: User provided class names
-            const selector = '.nhcyE a.M_f5h';
-
-            // Wait for canvas
+            // Wait for canvas to appear
             try {
-                await page.waitForSelector('.canvas-container', { timeout: 5000 });
+                await page.waitForSelector('.canvas-container', { timeout: 15000 });
             } catch (e) {
-                console.log('Canvas container not found, proceeding...');
+                console.log('Canvas container not found initially, proceeding...');
             }
 
-            // Wait for buttons
-            try {
-                // Wait for ANY generic button-like interaction area just in case.
-                await page.waitForFunction(() => {
-                    const buttons = Array.from(document.querySelectorAll('a, button'));
-                    return buttons.some(b => !isNaN(parseInt(b.textContent || '', 10)));
-                }, { timeout: 5000 });
-            } catch (e) {
-                console.log('Generic number buttons not found immediately, waiting...');
-            }
+            // Wait a moment for dynamic buttons to render
+            await new Promise(r => setTimeout(r, 2000));
 
-            let buttons: any[] = await page.$$(selector);
+            // Extract the step numbers (1, 2, 3...) robustly
+            const stepNumbers = await page.evaluate(() => {
+                const candidates = Array.from(document.querySelectorAll('a, button, div[role="button"]'));
+                const nums = candidates
+                    .map(el => parseInt(el.textContent?.trim() || '', 10))
+                    .filter(n => !isNaN(n) && n > 0 && n < 100);
+                return [...new Set(nums)].sort((a, b) => a - b);
+            });
 
-            // Strategy 2: Fallback to finding by Text Content if explicit class fails or finds too few
-            if (buttons.length <= 1) {
-                console.log(`Class selector found ${buttons.length} buttons. Trying text-based search...`);
+            const totalSteps = stepNumbers.length > 0 ? stepNumbers.length : 1;
+            const pagesData: any[] = [];
 
-                // Evaluate inside the page to find elements containing numbers 1..25
-                const numberButtonHandle = await page.evaluateHandle(() => {
-                    const candidates = Array.from(document.querySelectorAll('a, button, div[role="button"]'));
-                    return candidates.filter(el => {
-                        const txt = el.textContent?.trim();
-                        // Exact match integer less than 100
-                        return txt && /^\d+$/.test(txt) && parseInt(txt) < 100;
-                    });
-                });
+            console.log(`Found ${totalSteps} steps:`, stepNumbers);
 
-                const properties = await numberButtonHandle.getProperties();
-                buttons = [];
-                for (const prop of properties.values()) {
-                    const elementHandle = prop.asElement();
-                    if (elementHandle) buttons.push(elementHandle);
-                }
-            }
+            for (let i = 0; i < totalSteps; i++) {
+                socket.emit('importProgress', { current: i + 1, total: totalSteps, status: `Capturing Page ${i + 1}...` });
+                
+                const stepNum = stepNumbers.length > 0 ? stepNumbers[i] : (i + 1);
 
-            // Debugging: Log what we found
-            if (buttons.length === 0) {
-                console.log("Still no buttons found. Dumping body HTML snippet for debug...");
-                const html = await page.content();
-                console.log(html.substring(0, 1500) + '...');
-            }
+                if (stepNumbers.length > 0) {
+                    try {
+                        // Click using page.evaluate to prevent "navigating frame was detached" 
+                        // which occurs if Puppeteer's native click triggers navigation/DOM destruction mid-evaluation
+                        await page.evaluate((num) => {
+                            const candidates = Array.from(document.querySelectorAll('a, button, div[role="button"]'));
+                            const btn = candidates.find(el => {
+                                const txt = el.textContent?.trim();
+                                return txt === String(num);
+                            });
+                            if (btn) (btn as HTMLElement).click();
+                        }, stepNum);
 
-            // Sort buttons by their numeric text value to ensure correct order
-            if (buttons.length > 0) {
-                const buttonValPairs = [];
-                for (const btn of buttons) {
-                    const txt = await (await btn.getProperty('textContent')).jsonValue();
-                    const val = parseInt(txt as string, 10);
-                    if (!isNaN(val)) {
-                        buttonValPairs.push({ btn, val });
+                        // Wait for the canvas to update
+                        await new Promise(r => setTimeout(r, 1500));
+                    } catch (e: any) {
+                        console.log(`Click for step ${stepNum} had an issue (maybe navigation):`, e.message);
+                        // If a navigation occurred, wait a bit for the new page to settle
+                        await new Promise(r => setTimeout(r, 3000));
+                    }
+                    
+                    // Re-wait for canvas in case of navigation
+                    try {
+                        await page.waitForSelector('.canvas-container, canvas', { timeout: 10000 });
+                    } catch (e) {
+                        console.log('Canvas not found after click, proceeding anyway...');
                     }
                 }
-                // Sort by val
-                buttonValPairs.sort((a, b) => a.val - b.val);
-                buttons = buttonValPairs.map(p => p.btn);
-            }
 
-            const pagesData: any[] = [];
-            const totalSteps = buttons.length > 0 ? buttons.length : 1;
-
-            socket.emit('importProgress', { current: 0, total: totalSteps, status: 'Starting capture...' });
-
-            if (buttons.length === 0) {
-                // Single page capture
-                const filename = `import_${Date.now()}_step_0.png`;
+                const filename = `import_${Date.now()}_step_${i}.png`;
                 const filepath = path.join(uploadsPath, filename);
 
                 const container = await page.$('.canvas-container') || await page.$('canvas');
@@ -599,12 +584,18 @@ io.on('connection', (socket: Socket) => {
                     await page.screenshot({ path: filepath });
                 }
 
+                // Get dimensions
+                const size = await page.evaluate(() => {
+                    const c = document.querySelector('canvas');
+                    return c ? { w: c.width, h: c.height } : { w: 1200, h: 675 };
+                });
+
                 pagesData.push({
                     id: Math.random().toString(36).substr(2, 9),
                     config: {
                         shape: 'square',
-                        width: 1200,
-                        height: 675,
+                        width: size.w,
+                        height: size.h,
                         backgroundImageUrl: '/uploads/' + filename,
                         showGrid: false
                     },
@@ -613,50 +604,6 @@ io.on('connection', (socket: Socket) => {
                     text: [],
                     actionHistory: []
                 });
-            } else {
-                console.log(`Found ${buttons.length} steps.`);
-                for (let i = 0; i < buttons.length; i++) {
-                    socket.emit('importProgress', { current: i + 1, total: totalSteps, status: `Capturing Page ${i + 1}...` });
-
-                    // Re-query
-                    const currentButtons = await page.$$(selector);
-                    if (currentButtons[i]) {
-                        await currentButtons[i].click();
-                        // Wait for update
-                        await new Promise(r => setTimeout(r, 1500));
-
-                        const filename = `import_${Date.now()}_step_${i}.png`;
-                        const filepath = path.join(uploadsPath, filename);
-
-                        const container = await page.$('.canvas-container') || await page.$('canvas');
-                        if (container) {
-                            await container.screenshot({ path: filepath });
-                        } else {
-                            await page.screenshot({ path: filepath });
-                        }
-
-                        // Get dimensions
-                        const size = await page.evaluate(() => {
-                            const c = document.querySelector('canvas');
-                            return c ? { w: c.width, h: c.height } : { w: 1200, h: 675 };
-                        });
-
-                        pagesData.push({
-                            id: Math.random().toString(36).substr(2, 9),
-                            config: {
-                                shape: 'square',
-                                width: size.w,
-                                height: size.h,
-                                backgroundImageUrl: '/uploads/' + filename,
-                                showGrid: false
-                            },
-                            strokes: [],
-                            markers: {},
-                            text: [],
-                            actionHistory: []
-                        });
-                    }
-                }
             }
 
             await browser.close();
