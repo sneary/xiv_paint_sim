@@ -584,10 +584,14 @@ io.on('connection', (socket: Socket) => {
                     await page.screenshot({ path: filepath });
                 }
 
-                // Get dimensions
+                // Get dimensions of the element we just screenshotted
                 const size = await page.evaluate(() => {
-                    const c = document.querySelector('canvas');
-                    return c ? { w: c.width, h: c.height } : { w: 1200, h: 675 };
+                    const container = document.querySelector('.canvas-container') || document.querySelector('canvas');
+                    if (container) {
+                        const rect = container.getBoundingClientRect();
+                        return { w: Math.round(rect.width), h: Math.round(rect.height) };
+                    }
+                    return { w: 1200, h: 675 };
                 });
 
                 pagesData.push({

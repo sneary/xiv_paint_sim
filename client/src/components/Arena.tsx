@@ -438,23 +438,32 @@ const Arena = ({
                     eventMode={'static'}
                     hitArea={new PIXI.Rectangle(0, 0, canvasWidth, canvasHeight)}
                     onpointerdown={(e) => {
+                        if (!e.isPrimary) return;
                         const local = e.getLocalPosition(e.currentTarget as PIXI.DisplayObject);
                         onStrokeStart(local.x, local.y);
                     }}
                     onpointermove={(e) => {
+                        if (!e.isPrimary) return;
                         const local = e.getLocalPosition(e.currentTarget as PIXI.DisplayObject);
                         onStrokeMove(local.x, local.y);
                         updateCursorPos(local.x, local.y);
                     }}
                     onpointerover={(e) => {
+                        if (!e.isPrimary) return;
                         const local = e.getLocalPosition(e.currentTarget as PIXI.DisplayObject);
                         updateCursorPos(local.x, local.y);
                     }}
                     onpointerout={() => {
                         if (cursorRef.current) cursorRef.current.visible = false;
                     }}
-                    onpointerup={() => onStrokeEnd()}
-                    onpointerupoutside={() => onStrokeEnd()}
+                    onpointerup={(e) => {
+                        if (!e.isPrimary) return;
+                        onStrokeEnd();
+                    }}
+                    onpointerupoutside={(e) => {
+                        if (!e.isPrimary) return;
+                        onStrokeEnd();
+                    }}
                 />
 
                 {/* Grid */}

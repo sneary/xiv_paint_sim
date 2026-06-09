@@ -83,6 +83,8 @@ function App() {
 
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [scale, setScale] = useState(1);
+  const pinchRef = useRef<{ initialDist: number, initialScale: number } | null>(null);
+  const manualScaleRef = useRef<boolean>(false);
 
   // Helper to safely get current page
   // Helper to safely get current page (unused, removed)
@@ -101,7 +103,10 @@ function App() {
       const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
       const hBuffer = mobile ? 20 : 50;
       const s = Math.min(w / 800, (h - hBuffer) / 600);
-      setScale(s < 1 ? s : 1);
+      
+      if (!manualScaleRef.current) {
+        setScale(s < 1 ? s : 1);
+      }
     };
 
     window.addEventListener('resize', handleResize);
@@ -945,6 +950,7 @@ function App() {
 
 
   const startStroke = (x: number, y: number) => {
+    if (pinchRef.current) return;
     if (tool === 'rect') {
       setIsDrawing(true);
       currentStrokeIdRef.current = Math.random().toString(36).substr(2, 9);
@@ -1114,6 +1120,13 @@ function App() {
   };
 
   const moveStroke = (x: number, y: number) => {
+    if (pinchRef.current) {
+      if (isDrawing) {
+        setIsDrawing(false);
+        socketRef.current?.emit('endStroke', { id: currentStrokeIdRef.current });
+      }
+      return;
+    }
     mousePosRef.current = { x, y };
     // Selection Tool Logic
     if (tool === 'select') {
@@ -1940,8 +1953,8 @@ function App() {
             zIndex: 100,
             maxHeight: '90vh',
             overflowY: 'auto',
-            width: isMobile ? '265px' : '230px',
-            overflowX: 'hidden',
+            width: 'auto',
+            maxWidth: 'calc(100vw - 20px)',
             display: 'grid',
             gap: '10px',
             gridTemplateColumns: isMobile ? '1fr auto' : '1fr',
@@ -2046,7 +2059,7 @@ function App() {
 
               <div style={{
                 display: 'flex',
-                flexDirection: 'row',
+                flexDirection: isMobile ? 'column-reverse' : 'row',
                 alignItems: 'center',
                 gap: '15px',
                 justifyContent: 'center',
@@ -2066,11 +2079,13 @@ function App() {
                   {/* Size Slider */}
                   <div style={isMobile ? {
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     height: '150px',
                     width: '30px',
                     position: 'relative'
                   } : { flex: 1, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    {isMobile && <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '5px' }}>Size</div>}
                     {!isMobile && <div style={{ color: '#aaa', fontSize: '9px', lineHeight: '9px' }}>Size: {lineWidth}px</div>}
                     <input
                       type="range"
@@ -2092,12 +2107,14 @@ function App() {
                   {/* Opacity Slider */}
                   <div style={isMobile ? {
                     display: 'flex',
+                    flexDirection: 'column',
                     alignItems: 'center',
                     height: '150px',
                     width: '30px',
                     position: 'relative',
                     marginLeft: '10px'
                   } : { flex: 1, width: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    {isMobile && <div style={{ color: '#aaa', fontSize: '10px', marginBottom: '5px' }}>Opac</div>}
                     {!isMobile && <div style={{ color: '#aaa', fontSize: '9px', lineHeight: '9px' }}>Opacity: {Math.round(opacity * 100)}%</div>}
                     <input
                       type="range"
@@ -2443,11 +2460,50 @@ function App() {
         )
       }
 
-      <div style={{
-        position: 'relative',
-        width: ((gameState.pages[gameState.currentPageIndex].config?.backgroundImageUrl && gameState.pages[gameState.currentPageIndex].config?.width) || 800) * scale,
-        height: ((gameState.pages[gameState.currentPageIndex].config?.backgroundImageUrl && gameState.pages[gameState.currentPageIndex].config?.height) || 600) * scale
-      }}>
+      <div 
+        style={{
+          position: 'relative',
+          width: ((gameState.pages[gameState.currentPageIndex].config?.backgroundImageUrl && gameState.pages[gameState.currentPageIndex].config?.width) || 800) * scale,
+          height: ((gameState.pages[gameState.currentPageIndex].config?.backgroundImageUrl && gameState.pages[gameState.currentPageIndex].config?.height) || 600) * scale
+        }}
+        onTouchStart={(e) => {
+          if (e.touches.length === 2) {
+            manualScaleRef.current = true;
+            const dist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            pinchRef.current = { initialDist: dist, initialScale: scale };
+          }
+        }}
+        onTouchMove={(e) => {
+          if (e.touches.length === 2 && pinchRef.current) {
+            const dist = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            const zoomDelta = dist / pinchRef.current.initialDist;
+            const newScale = pinchRef.current.initialScale * zoomDelta;
+            
+            const config = gameState.pages[gameState.currentPageIndex].config;
+            const nativeWidth = (config?.backgroundImageUrl && config?.width) ? config.width : 800;
+            const nativeHeight = (config?.backgroundImageUrl && config?.height) ? config.height : 600;
+            
+            const w = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+            const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            const hBuffer = isMobile ? 20 : 50;
+            const minScale = Math.min(w / nativeWidth, (h - hBuffer) / nativeHeight);
+
+            // Clamp scale: prevent zooming out past the fully visible canvas
+            setScale(Math.min(Math.max(newScale, minScale), 5));
+          }
+        }}
+        onTouchEnd={(e) => {
+          if (e.touches.length < 2) {
+            pinchRef.current = null;
+          }
+        }}
+      >
         <Arena
           players={gameState.players}
           myId={socketRef.current?.id}
